@@ -1,8 +1,11 @@
 package jaitsizazu.engine.desktop
 
 import jaitsizazu.core.ConversionRequest
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaConverter
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import java.io.IOException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
@@ -13,7 +16,7 @@ import java.nio.file.Path
  * Desktop adapter for [MediaConverter]: runs ffmpeg as a subprocess.
  *
  * [locateFfmpeg] is asked on every conversion, so a missing ffmpeg becomes a
- * [MediaResult.Failure] that tells the user how to provide it, and ffmpeg
+ * [MediaResult.Failure] that the UI turns into how to provide it, and ffmpeg
  * installed while the app runs is picked up on the next try.
  *
  * Before ffmpeg runs, the output path is claimed with [claimFile], which must
@@ -24,8 +27,8 @@ import java.nio.file.Path
  *
  * When ffmpeg cannot start, fails, the coroutine is cancelled or anything else
  * throws, that claimed file is removed with [deleteFile], so no partial output
- * sits next to the original. A file that could not be removed is reported: in
- * the failure reason, or as a suppressed exception of what was thrown.
+ * sits next to the original. A file that could not be removed is reported: as
+ * the failure's leftover, or as a suppressed exception of what was thrown.
  */
 class FfmpegConverter(
     private val locateFfmpeg: () -> ToolLookup,
@@ -37,7 +40,7 @@ class FfmpegConverter(
     override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
         val ffmpeg = when (val lookup = locateFfmpeg()) {
             is ToolLookup.Found -> lookup.path
-            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.message)
+            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.problem)
         }
         val command = listOf(ffmpeg) + FfmpegArguments.build(request.inputPath, outputPath, request.target)
         claim(outputPath)?.let { return it }
@@ -45,7 +48,7 @@ class FfmpegConverter(
         val outcome = try {
             runner.run(command)
         } catch (e: IOException) {
-            return failureAfterCleanup("Could not start ffmpeg ($ffmpeg): ${e.message}", outputPath)
+            return failureAfterCleanup(Problem.ToolDidNotStart(Tool.FFMPEG, ffmpeg, e.message), outputPath)
         } catch (e: Throwable) {
             // A cancellation, or an error nobody expected. On cancellation SystemProcessRunner
             // kills ffmpeg and waits a bounded time for it to exit, so on Windows a slow
@@ -56,7 +59,7 @@ class FfmpegConverter(
         return if (outcome.exitCode == 0) {
             MediaResult.Success(outputPath)
         } else {
-            failureAfterCleanup(failureReason(outcome), outputPath)
+            failureAfterCleanup(Problem.ConversionFailed(outcome.exitCode, outcome.stderrTail), outputPath)
         }
     }
 
@@ -66,13 +69,13 @@ class FfmpegConverter(
             claimFile(outputPath)
             null
         } catch (_: FileAlreadyExistsException) {
-            MediaResult.Failure("$outputPath already exists. Nothing was overwritten.")
+            MediaResult.Failure(Problem.FileAlreadyExists(outputPath))
         } catch (e: IOException) {
-            MediaResult.Failure("Could not create $outputPath: ${e.message}")
+            MediaResult.Failure(Problem.CannotCreateFile(outputPath, e.message))
         } catch (e: SecurityException) {
-            MediaResult.Failure("Could not create $outputPath: ${e.message}")
+            MediaResult.Failure(Problem.CannotCreateFile(outputPath, e.message))
         } catch (e: InvalidPathException) {
-            MediaResult.Failure("Could not create $outputPath: ${e.message}")
+            MediaResult.Failure(Problem.CannotCreateFile(outputPath, e.message))
         }
 
     /** Deletes the output this conversion claimed. Returns why it could not, or null. */
@@ -86,14 +89,9 @@ class FfmpegConverter(
             e
         }
 
-    /** Removes the claimed output; a file that stays behind is added to [reason], never hides it. */
-    private fun failureAfterCleanup(reason: String, outputPath: String): MediaResult.Failure {
-        val leftover = removeClaimedOutput(outputPath) ?: return MediaResult.Failure(reason)
-        return MediaResult.Failure("$reason\nThe unfinished file $outputPath could not be removed: ${leftover.message}")
-    }
-
-    private fun failureReason(outcome: ProcessOutcome): String {
-        val summary = "The conversion failed (ffmpeg exit code ${outcome.exitCode})."
-        return if (outcome.stderrTail.isBlank()) summary else "$summary\n${outcome.stderrTail}"
+    /** Removes the claimed output; a file that stays behind is reported next to [problem], never hides it. */
+    private fun failureAfterCleanup(problem: Problem, outputPath: String): MediaResult.Failure {
+        val leftover = removeClaimedOutput(outputPath) ?: return MediaResult.Failure(problem)
+        return MediaResult.Failure(problem, Leftover.UnfinishedFile(outputPath, leftover.message))
     }
 }

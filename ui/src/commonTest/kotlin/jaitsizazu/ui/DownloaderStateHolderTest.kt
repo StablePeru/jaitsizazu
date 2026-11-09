@@ -6,8 +6,11 @@ import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.DownloadRequest
 import jaitsizazu.core.DownloaderUpdater
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaDownloader
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.core.UpdateResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -24,8 +27,6 @@ import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -163,17 +164,18 @@ class DownloaderStateHolderTest {
 
     @Test
     fun showsWhyADownloadFailed() = runTest {
-        val holder = holder(FakeDownloader { MediaResult.Failure("yt-dlp failed") })
+        val failed = Problem.DownloadFailed(1, "ERROR: Unsupported URL")
+        val leftover = Leftover.TemporaryFolder("/home/me/Downloads/.jaitsizazu-1", "busy")
+        val holder = holder(FakeDownloader { MediaResult.Failure(failed, leftover) })
         holder.setUrl(url)
         holder.download()
         advanceUntilIdle()
-        assertEquals(DownloadStatus.Failed("yt-dlp failed"), holder.state.value.status)
+        assertEquals(DownloadStatus.Failed(failed, leftover), holder.state.value.status)
 
         holder.setUrl("not an address")
         holder.download()
         advanceUntilIdle()
-        val status = holder.state.value.status
-        assertTrue(status is DownloadStatus.Failed && "https://" in status.reason, "$status")
+        assertEquals(DownloadStatus.Failed(Problem.NotAWebAddress("not an address")), holder.state.value.status)
     }
 
     @Test
@@ -184,8 +186,7 @@ class DownloaderStateHolderTest {
         holder.download()
         advanceUntilIdle()
 
-        val status = holder.state.value.status
-        assertTrue(status is DownloadStatus.Failed && "boom" in status.reason, "$status")
+        assertEquals(DownloadStatus.Failed(Problem.Unexpected("boom")), holder.state.value.status)
     }
 
     @Test
@@ -351,13 +352,13 @@ class DownloaderStateHolderTest {
     @Test
     fun aSuccessfulDownloadClearsTheSetupWarning() = runTest {
         val holder = holder()
-        holder.showSetupWarning("deno was not found.")
+        holder.showSetupWarnings(listOf(Problem.ToolNotFound(Tool.DENO, "JAITSIZAZU_DENO", "bin/deno")))
         holder.setUrl(url)
 
         holder.download()
         advanceUntilIdle()
 
-        assertNull(holder.state.value.setupWarning)
+        assertEquals(emptyList(), holder.state.value.setupWarnings)
     }
 
     @Test
@@ -383,16 +384,25 @@ class DownloaderStateHolderTest {
 
     @Test
     fun showsAFailedUpdate() = runTest {
-        val refused = holder(updater = FakeUpdater { UpdateResult.Failed("yt-dlp is read-only.") })
+        val readOnly = Problem.ToolReadOnly(Tool.YT_DLP, "/usr/bin/yt-dlp")
+        val refused = holder(updater = FakeUpdater { UpdateResult.Failed(readOnly) })
         val broken = holder(updater = FakeUpdater { error("boom") })
 
         refused.updateDownloader()
         broken.updateDownloader()
         advanceUntilIdle()
 
-        assertEquals(UpdateStatus.Failed("yt-dlp is read-only."), refused.state.value.update)
-        val status = broken.state.value.update
-        assertIs<UpdateStatus.Failed>(status)
-        assertTrue("boom" in status.reason, status.reason)
+        assertEquals(UpdateStatus.Failed(readOnly), refused.state.value.update)
+        assertEquals(UpdateStatus.Failed(Problem.Unexpected("boom")), broken.state.value.update)
+    }
+
+    @Test
+    fun showsAnUpdateThatDidNotSayItsVersion() = runTest {
+        val holder = holder(updater = FakeUpdater { UpdateResult.Unclear("WARNING: something") })
+
+        holder.updateDownloader()
+        advanceUntilIdle()
+
+        assertEquals(UpdateStatus.Unclear("WARNING: something"), holder.state.value.update)
     }
 }

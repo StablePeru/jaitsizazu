@@ -14,13 +14,11 @@ class DownloadMedia(
 ) {
     suspend operator fun invoke(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit = {}): MediaResult {
         val url = request.url.trim()
-        if (url.isEmpty()) return MediaResult.Failure("Paste the web address of a video or a song first.")
-        if (!isWebAddress(url)) {
-            return MediaResult.Failure("$url is not a web address. It must start with https:// or http://.")
-        }
+        if (url.isEmpty()) return MediaResult.Failure(Problem.NoWebAddress)
+        if (!isWebAddress(url)) return MediaResult.Failure(Problem.NotAWebAddress(url))
         val folder = request.outputDirectory
-        if (folder.isBlank()) return MediaResult.Failure("Choose a folder to save the download in.")
-        if (!isDirectory(folder)) return MediaResult.Failure("The folder $folder does not exist.")
+        if (folder.isBlank()) return MediaResult.Failure(Problem.NoFolderChosen)
+        if (!isDirectory(folder)) return MediaResult.Failure(Problem.FolderNotFound(folder))
 
         return downloader.download(request.copy(url = url), onProgress)
     }

@@ -3,8 +3,11 @@ package jaitsizazu.ui
 import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.ConvertMedia
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaConverter
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,11 +23,12 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle
 class ConverterStateHolderTest {
+
+    private val noFfmpeg = Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg")
 
     /** Waits for [gate] before answering, so tests can look at the Converting state. */
     private class FakeConverter(
@@ -101,13 +105,14 @@ class ConverterStateHolderTest {
 
     @Test
     fun showsTheFailureReason() = runTest {
-        val holder = holder(FakeConverter { MediaResult.Failure("ffmpeg failed") })
+        val leftover = Leftover.UnfinishedFile("/voice/memo.wav", "busy")
+        val holder = holder(FakeConverter { MediaResult.Failure(Problem.ConversionFailed(1, "ffmpeg failed"), leftover) })
         holder.selectFile(memo)
 
         holder.convert()
         advanceUntilIdle()
 
-        assertEquals(ConversionStatus.Failed("ffmpeg failed"), holder.state.value.status)
+        assertEquals(ConversionStatus.Failed(Problem.ConversionFailed(1, "ffmpeg failed"), leftover), holder.state.value.status)
     }
 
     @Test
@@ -118,8 +123,7 @@ class ConverterStateHolderTest {
         holder.convert()
         advanceUntilIdle()
 
-        val status = holder.state.value.status
-        assertTrue(status is ConversionStatus.Failed && "boom" in status.reason, "$status")
+        assertEquals(ConversionStatus.Failed(Problem.Unexpected("boom")), holder.state.value.status)
     }
 
     @Test
@@ -160,9 +164,9 @@ class ConverterStateHolderTest {
         // The converter looks for ffmpeg again, so the user can fix it without a restart.
         val converter = FakeConverter()
         val holder = holder(converter)
-        holder.showSetupWarning("ffmpeg was not found.")
+        holder.showSetupWarnings(listOf(noFfmpeg))
         holder.selectFile(memo)
-        assertEquals("ffmpeg was not found.", holder.state.value.setupWarning)
+        assertEquals(listOf(noFfmpeg), holder.state.value.setupWarnings)
         assertTrue(holder.state.value.canConvert)
 
         holder.convert()
@@ -170,19 +174,19 @@ class ConverterStateHolderTest {
 
         assertEquals(1, converter.requests.size)
         assertEquals(ConversionStatus.Done("/voice/memo.wav"), holder.state.value.status)
-        assertNull(holder.state.value.setupWarning, "a conversion that worked proves ffmpeg is there")
+        assertEquals(emptyList(), holder.state.value.setupWarnings, "a conversion that worked proves ffmpeg is there")
     }
 
     @Test
     fun keepsTheSetupWarningWhenTheConversionFails() = runTest {
-        val holder = holder(FakeConverter { MediaResult.Failure("ffmpeg was not found.") })
-        holder.showSetupWarning("ffmpeg was not found.")
+        val holder = holder(FakeConverter { MediaResult.Failure(noFfmpeg) })
+        holder.showSetupWarnings(listOf(noFfmpeg))
         holder.selectFile(memo)
 
         holder.convert()
         advanceUntilIdle()
 
-        assertEquals("ffmpeg was not found.", holder.state.value.setupWarning)
+        assertEquals(listOf(noFfmpeg), holder.state.value.setupWarnings)
     }
 
     @Test

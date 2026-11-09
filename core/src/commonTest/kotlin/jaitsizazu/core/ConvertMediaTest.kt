@@ -3,7 +3,6 @@ package jaitsizazu.core
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ConvertMediaTest {
@@ -61,7 +60,7 @@ class ConvertMediaTest {
 
         val result = convert(ConversionRequest("  ", AudioFormat.WAV))
 
-        assertIs<MediaResult.Failure>(result)
+        assertEquals(MediaResult.Failure(Problem.NoFileChosen), result)
         assertTrue(converter.calls.isEmpty())
     }
 
@@ -72,8 +71,7 @@ class ConvertMediaTest {
 
         val result = convert(ConversionRequest("/voice/gone.ogg", AudioFormat.WAV))
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue(result.reason.contains("gone.ogg"))
+        assertEquals(MediaResult.Failure(Problem.FileNotFound("/voice/gone.ogg")), result)
         assertTrue(converter.calls.isEmpty())
     }
 
@@ -84,7 +82,7 @@ class ConvertMediaTest {
 
         val result = convert(ConversionRequest("/voice/", AudioFormat.WAV))
 
-        assertIs<MediaResult.Failure>(result)
+        assertEquals(MediaResult.Failure(Problem.NotAFile("/voice/")), result)
         assertTrue(converter.calls.isEmpty())
     }
 
@@ -95,13 +93,13 @@ class ConvertMediaTest {
 
         val result = convert(ConversionRequest("/voice/memo.ogg", AudioFormat.WAV))
 
-        assertIs<MediaResult.Failure>(result)
+        assertEquals(MediaResult.Failure(Problem.NoFreeName("/voice/memo.ogg")), result)
         assertTrue(converter.calls.isEmpty())
     }
 
     @Test
     fun passesTheConverterFailureThrough() = runTest {
-        val failure = MediaResult.Failure("ffmpeg failed")
+        val failure = MediaResult.Failure(Problem.ConversionFailed(exitCode = 1, toolOutput = "ffmpeg failed"))
         val convert = ConvertMedia(FakeConverter(failure), existing("/voice/memo.ogg"))
 
         assertEquals(failure, convert(ConversionRequest("/voice/memo.ogg", AudioFormat.MP3)))

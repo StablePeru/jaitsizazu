@@ -1,5 +1,6 @@
 package jaitsizazu.desktop
 
+import jaitsizazu.core.Problem
 import jaitsizazu.engine.desktop.ToolLookup
 import java.nio.file.Files
 import java.nio.file.Path
@@ -18,12 +19,9 @@ fun defaultDownloadDirectory(
 }
 
 /**
- * The startup warning of the download screen: the message of every tool that
- * was not found, or null when all are there. Each message already says what
- * the tool is needed for, so a missing deno reads as a YouTube-only problem.
+ * The startup warnings of the download screen: the problem of every tool that
+ * was not found, or none when all are there. The screen says what each tool is
+ * needed for, so a missing deno reads as a YouTube-only problem.
  */
-fun downloadSetupWarning(ytDlp: ToolLookup, ffmpeg: ToolLookup, deno: ToolLookup): String? =
-    listOf(ytDlp, ffmpeg, deno)
-        .filterIsInstance<ToolLookup.NotFound>()
-        .joinToString("\n\n") { it.message }
-        .ifEmpty { null }
+fun downloadSetupWarnings(ytDlp: ToolLookup, ffmpeg: ToolLookup, deno: ToolLookup): List<Problem> =
+    listOf(ytDlp, ffmpeg, deno).filterIsInstance<ToolLookup.NotFound>().map { it.problem }

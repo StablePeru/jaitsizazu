@@ -3,6 +3,9 @@ package jaitsizazu.desktop
 import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.use
+import jaitsizazu.core.Leftover
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.ui.ConversionStatus
 import jaitsizazu.ui.ConverterScreen
 import jaitsizazu.ui.ConverterState
@@ -41,9 +44,16 @@ class ConverterScreenRenderTest {
             ConverterState(),
             ConverterState(selectedFile = file, status = ConversionStatus.Converting),
             ConverterState(selectedFile = file, status = ConversionStatus.Done("/voice/memo.wav")),
-            ConverterState(selectedFile = file, status = ConversionStatus.Failed("ffmpeg failed")),
+            ConverterState(selectedFile = file, status = ConversionStatus.Failed(Problem.ConversionFailed(1, "ffmpeg failed"))),
+            ConverterState(
+                selectedFile = file,
+                status = ConversionStatus.Failed(
+                    Problem.ConversionFailed(1, "ffmpeg failed"),
+                    Leftover.UnfinishedFile("/voice/memo.wav", "busy"),
+                ),
+            ),
             ConverterState(selectedFile = file, status = ConversionStatus.Cancelled),
-            ConverterState(setupWarning = "ffmpeg was not found."),
+            ConverterState(setupWarnings = listOf(Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg"))),
         )
         for (state in states) {
             // A blank or uniform image means nothing was drawn.

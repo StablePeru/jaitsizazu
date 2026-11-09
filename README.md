@@ -120,7 +120,7 @@ The script pins the Temurin, FFmpeg, yt-dlp and Deno versions at its top, downlo
 
 ## Architecture
 
-Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` and `DownloadMedia` use cases and three ports, `MediaConverter`, `MediaDownloader` and `DownloaderUpdater`. Each platform plugs in an engine adapter: on desktop it runs ffmpeg and yt-dlp (with Deno) as subprocesses; on Android it will use youtubedl-android. The shared Compose UI only talks to the use cases.
+Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` and `DownloadMedia` use cases and three ports, `MediaConverter`, `MediaDownloader` and `DownloaderUpdater`. Failures are typed `Problem` values, not sentences: the UI puts them into words in the app's language and quotes the output of ffmpeg and yt-dlp as it is. Each platform plugs in an engine adapter: on desktop it runs ffmpeg and yt-dlp (with Deno) as subprocesses; on Android it will use youtubedl-android. The shared Compose UI only talks to the use cases.
 
 | Module | Content |
 |--------|---------|

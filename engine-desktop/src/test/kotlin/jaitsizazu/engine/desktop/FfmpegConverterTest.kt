@@ -2,7 +2,10 @@ package jaitsizazu.engine.desktop
 
 import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -94,19 +97,21 @@ class FfmpegConverterTest {
 
         val result = converter(runner).convert(request, "/voice/memo.wav")
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("exit code 1" in result.reason, result.reason)
-        assertTrue("Invalid data found" in result.reason, result.reason)
+        assertEquals(
+            MediaResult.Failure(Problem.ConversionFailed(1, "memo.ogg: Invalid data found when processing input")),
+            result,
+        )
     }
 
     @Test
     fun reportsAMissingFfmpegWithoutClaimingOrRunningAnything() = runTest {
         val runner = FakeRunner { error("must not run") }
-        val missing = { ToolLookup.NotFound("ffmpeg was not found.") }
+        val problem = Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg")
+        val missing = { ToolLookup.NotFound(problem) }
 
         val result = FfmpegConverter(missing, runner, claimFile = { claimed += it }).convert(request, "/voice/memo.wav")
 
-        assertEquals(MediaResult.Failure("ffmpeg was not found."), result)
+        assertEquals(MediaResult.Failure(problem), result)
         assertTrue(runner.commands.isEmpty())
         assertTrue(claimed.isEmpty())
     }
@@ -118,7 +123,7 @@ class FfmpegConverterTest {
         val result = converter(runner, claimFile = { throw FileAlreadyExistsException(it) })
             .convert(request, "/voice/memo.wav")
 
-        assertEquals(MediaResult.Failure("/voice/memo.wav already exists. Nothing was overwritten."), result)
+        assertEquals(MediaResult.Failure(Problem.FileAlreadyExists("/voice/memo.wav")), result)
         assertTrue(runner.commands.isEmpty())
         assertTrue(deleted.isEmpty(), "a file that was already there is not ours to delete")
     }
@@ -131,7 +136,9 @@ class FfmpegConverterTest {
             .convert(request, "/voice/memo.wav")
 
         assertIs<MediaResult.Failure>(result)
-        assertTrue("Could not create /voice/memo.wav" in result.reason, result.reason)
+        val problem = result.problem
+        assertIs<Problem.CannotCreateFile>(problem)
+        assertEquals("/voice/memo.wav", problem.path)
         assertTrue(runner.commands.isEmpty())
         assertTrue(deleted.isEmpty())
     }
@@ -142,9 +149,10 @@ class FfmpegConverterTest {
 
         val result = converter(runner).convert(request, "/voice/memo.wav")
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("Could not start ffmpeg" in result.reason, result.reason)
-        assertTrue("Permission denied" in result.reason, result.reason)
+        assertEquals(
+            MediaResult.Failure(Problem.ToolDidNotStart(Tool.FFMPEG, "/usr/bin/ffmpeg", "error=13, Permission denied")),
+            result,
+        )
         assertEquals(listOf("/voice/memo.wav"), deleted)
     }
 
@@ -211,8 +219,12 @@ class FfmpegConverterTest {
 
         val result = converter(runner, deleteFile = { throw IOException("busy") }).convert(request, "/voice/memo.wav")
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("exit code 1" in result.reason, result.reason)
-        assertTrue("/voice/memo.wav could not be removed: busy" in result.reason, result.reason)
+        assertEquals(
+            MediaResult.Failure(
+                Problem.ConversionFailed(1, "Error while decoding stream"),
+                Leftover.UnfinishedFile("/voice/memo.wav", "busy"),
+            ),
+            result,
+        )
     }
 }

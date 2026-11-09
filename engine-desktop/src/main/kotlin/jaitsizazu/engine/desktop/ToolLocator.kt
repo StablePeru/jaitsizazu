@@ -1,27 +1,34 @@
 package jaitsizazu.engine.desktop
 
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 
 /**
- * An external program the desktop engine runs. [binaryName] is its name
- * without any extension, as users know it (`ffmpeg`, not `ffmpeg.exe`).
- * [envVar] may hold its full path, and [purpose] completes
- * "Jaitsizazu needs it to ..." in the not-found message.
+ * An external program the desktop engine runs, as the domain [Tool] it is.
+ * [envVar] may hold its full path.
  */
-enum class ExternalTool(val binaryName: String, val envVar: String, val purpose: String) {
-    FFMPEG("ffmpeg", "JAITSIZAZU_FFMPEG", "convert files and to finish downloads"),
-    YT_DLP("yt-dlp", "JAITSIZAZU_YTDLP", "download"),
-    DENO("deno", "JAITSIZAZU_DENO", "download from YouTube"),
+enum class ExternalTool(val tool: Tool, val envVar: String) {
+    FFMPEG(Tool.FFMPEG, "JAITSIZAZU_FFMPEG"),
+    YT_DLP(Tool.YT_DLP, "JAITSIZAZU_YTDLP"),
+    DENO(Tool.DENO, "JAITSIZAZU_DENO"),
+    ;
+
+    /** The binary name without any extension, as users know it (`ffmpeg`, not `ffmpeg.exe`). */
+    val binaryName: String get() = tool.displayName
 }
 
 /** Where a tool is, or why it was not found. */
 sealed interface ToolLookup {
     data class Found(val path: String) : ToolLookup
 
-    /** [message] is meant for the user and says how to provide the tool. */
-    data class NotFound(val message: String) : ToolLookup
+    /**
+     * [problem] is [Problem.ToolNotFound] or [Problem.ToolNotAtConfiguredPath]:
+     * the UI turns it into words that say how to provide the tool.
+     */
+    data class NotFound(val problem: Problem) : ToolLookup
 }
 
 /**
@@ -49,16 +56,14 @@ class ToolLocator(
             return if (path != null && isExecutableFile(path)) {
                 ToolLookup.Found(path.toString())
             } else {
-                ToolLookup.NotFound(
-                    "${tool.envVar} is set to $configured, but there is no executable ${tool.binaryName} there.",
-                )
+                ToolLookup.NotFound(Problem.ToolNotAtConfiguredPath(tool.tool, tool.envVar, configured))
             }
         }
 
         val candidates = listOfNotNull(appDirectory?.resolve("bin")?.resolve(fileName)) +
             pathEntries().map { it.resolve(fileName) }
         val found = candidates.firstOrNull(isExecutableFile)
-            ?: return ToolLookup.NotFound(notFoundMessage())
+            ?: return ToolLookup.NotFound(notFound())
         return ToolLookup.Found(found.toString())
     }
 
@@ -78,13 +83,8 @@ class ToolLocator(
             null
         }
 
-    private fun notFoundMessage(): String {
-        val name = tool.binaryName
+    private fun notFound(): Problem {
         val bundled = if (isWindows) "bin\\$fileName" else "bin/$fileName"
-        return "$name was not found. Jaitsizazu needs it to ${tool.purpose}. " +
-            "Install $name so that it is on your PATH, " +
-            "or set ${tool.envVar} to the full path of the $name binary, " +
-            "or put it in the app folder as $bundled. Then try again. " +
-            "If you changed PATH or ${tool.envVar}, restart Jaitsizazu first."
+        return Problem.ToolNotFound(tool.tool, tool.envVar, bundled)
     }
 }

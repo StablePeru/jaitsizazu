@@ -4,7 +4,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DownloadMediaTest {
@@ -40,8 +39,7 @@ class DownloadMediaTest {
     fun asksForAnAddressWhenItIsBlank() = runTest {
         val result = downloadMedia(request("   "))
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("Paste" in result.reason, result.reason)
+        assertEquals(MediaResult.Failure(Problem.NoWebAddress), result)
         assertTrue(downloader.requests.isEmpty())
     }
 
@@ -50,8 +48,7 @@ class DownloadMediaTest {
         for (url in listOf("file:///etc/passwd", "ftp://example.org/a", "--exec rm", "example.org/clip")) {
             val result = downloadMedia(request(url))
 
-            assertIs<MediaResult.Failure>(result, url)
-            assertTrue("https://" in result.reason, result.reason)
+            assertEquals(MediaResult.Failure(Problem.NotAWebAddress(url)), result, url)
         }
         assertTrue(downloader.requests.isEmpty())
     }
@@ -61,9 +58,8 @@ class DownloadMediaTest {
         val blank = downloadMedia(request("https://example.org/clip", folder = " "))
         val missing = downloadMedia(request("https://example.org/clip", folder = "/nowhere"))
 
-        assertIs<MediaResult.Failure>(blank)
-        assertIs<MediaResult.Failure>(missing)
-        assertTrue("/nowhere" in missing.reason, missing.reason)
+        assertEquals(MediaResult.Failure(Problem.NoFolderChosen), blank)
+        assertEquals(MediaResult.Failure(Problem.FolderNotFound("/nowhere")), missing)
         assertTrue(downloader.requests.isEmpty())
     }
 

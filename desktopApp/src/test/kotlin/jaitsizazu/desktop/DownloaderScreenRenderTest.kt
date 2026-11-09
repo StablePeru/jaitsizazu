@@ -4,6 +4,9 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.use
 import jaitsizazu.core.DownloadProgress
+import jaitsizazu.core.Leftover
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.ui.DownloadStatus
 import jaitsizazu.ui.DownloaderScreen
 import jaitsizazu.ui.DownloaderState
@@ -52,14 +55,23 @@ class DownloaderScreenRenderTest {
             ready.copy(status = DownloadStatus.Downloading(DownloadProgress.Downloading(42.0, 2048.0, 65))),
             ready.copy(status = DownloadStatus.Downloading(DownloadProgress.Processing)),
             ready.copy(status = DownloadStatus.Done("/home/me/Downloads/Clip [abc].mp3")),
-            ready.copy(status = DownloadStatus.Failed("yt-dlp failed")),
+            ready.copy(status = DownloadStatus.Failed(Problem.DownloadFailed(1, "ERROR: Unsupported URL"))),
+            ready.copy(status = DownloadStatus.Failed(Problem.AlreadyInFolder("Clip [abc].mp3", "clip [ABC].mp3"))),
+            ready.copy(
+                status = DownloadStatus.Failed(
+                    Problem.NoFileReported,
+                    Leftover.TemporaryFolder("/home/me/Downloads/.jaitsizazu-123", "busy"),
+                ),
+            ),
             ready.copy(status = DownloadStatus.Cancelling),
             ready.copy(status = DownloadStatus.Cancelled()),
             ready.copy(status = DownloadStatus.Cancelled(leftoverFolder = "/home/me/Downloads/.jaitsizazu-123")),
             ready.copy(update = UpdateStatus.Updating),
             ready.copy(update = UpdateStatus.Done("yt-dlp is up to date")),
-            ready.copy(update = UpdateStatus.Failed("yt-dlp is read-only")),
-            ready.copy(setupWarning = "yt-dlp was not found."),
+            ready.copy(update = UpdateStatus.Unclear("WARNING: something")),
+            ready.copy(update = UpdateStatus.Unclear(null)),
+            ready.copy(update = UpdateStatus.Failed(Problem.ToolReadOnly(Tool.YT_DLP, "/usr/bin/yt-dlp"))),
+            ready.copy(setupWarnings = listOf(Problem.ToolNotAtConfiguredPath(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "/x"))),
         )
         for (state in states) {
             // A blank or uniform image means nothing was drawn.

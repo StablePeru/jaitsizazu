@@ -7,6 +7,7 @@ import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.DownloadRequest
 import jaitsizazu.core.DownloaderUpdater
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
 import jaitsizazu.core.UpdateResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -67,9 +68,9 @@ class DownloaderStateHolder(
 
     fun selectFolder(path: String) = edit { it.copy(outputDirectory = path) }
 
-    /** Shows [message] as a warning that does not block downloading, or clears it when null. */
-    fun showSetupWarning(message: String?) {
-        mutableState.update { it.copy(setupWarning = message) }
+    /** Shows [problems] as warnings that do not block downloading, or clears them when empty. */
+    fun showSetupWarnings(problems: List<Problem>) {
+        mutableState.update { it.copy(setupWarnings = problems) }
     }
 
     fun download() {
@@ -106,19 +107,19 @@ class DownloaderStateHolder(
                 }
                 when (result) {
                     is MediaResult.Success -> DownloadStatus.Done(result.outputPath)
-                    is MediaResult.Failure -> DownloadStatus.Failed(result.reason)
+                    is MediaResult.Failure -> DownloadStatus.Failed(result.problem, result.leftover)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                DownloadStatus.Failed("Unexpected error: ${e.message ?: e::class.simpleName}")
+                DownloadStatus.Failed(Problem.Unexpected(e.message ?: e::class.simpleName.orEmpty()))
             }
             // A result that arrives after cancel() must not replace the Cancelling status.
             ensureActive()
             mutableState.update {
                 // A download that worked proves the tools are there after all.
-                val warning = if (status is DownloadStatus.Done) null else it.setupWarning
-                it.copy(status = status, setupWarning = warning)
+                val warnings = if (status is DownloadStatus.Done) emptyList() else it.setupWarnings
+                it.copy(status = status, setupWarnings = warnings)
             }
         }
     }
@@ -153,13 +154,14 @@ class DownloaderStateHolder(
         scope.launch {
             val status = try {
                 when (val result = withContext(workContext) { updater.update() }) {
-                    is UpdateResult.Updated -> UpdateStatus.Done(result.message)
-                    is UpdateResult.Failed -> UpdateStatus.Failed(result.reason)
+                    is UpdateResult.Updated -> UpdateStatus.Done(result.toolReport)
+                    is UpdateResult.Unclear -> UpdateStatus.Unclear(result.lastLine)
+                    is UpdateResult.Failed -> UpdateStatus.Failed(result.problem)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                UpdateStatus.Failed("Unexpected error: ${e.message ?: e::class.simpleName}")
+                UpdateStatus.Failed(Problem.Unexpected(e.message ?: e::class.simpleName.orEmpty()))
             }
             mutableState.update { it.copy(update = status) }
         }

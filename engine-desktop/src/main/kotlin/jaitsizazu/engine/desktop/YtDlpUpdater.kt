@@ -1,6 +1,8 @@
 package jaitsizazu.engine.desktop
 
 import jaitsizazu.core.DownloaderUpdater
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.core.UpdateResult
 import java.io.IOException
 import java.nio.file.Files
@@ -13,7 +15,7 @@ import java.nio.file.Path
  * It updates exactly the binary that downloads use, because both ask the same
  * [locateYtDlp]. yt-dlp writes the new binary next to the old one, so the file
  * and its folder must both be writable; when one is not (a system-wide install,
- * for example), the update is refused with an explanation, before yt-dlp runs.
+ * for example), the update is refused before yt-dlp runs.
  */
 class YtDlpUpdater(
     private val locateYtDlp: () -> ToolLookup,
@@ -24,15 +26,11 @@ class YtDlpUpdater(
     override suspend fun update(): UpdateResult {
         val binary = when (val lookup = locateYtDlp()) {
             is ToolLookup.Found -> Path.of(lookup.path)
-            is ToolLookup.NotFound -> return UpdateResult.Failed(lookup.message)
+            is ToolLookup.NotFound -> return UpdateResult.Failed(lookup.problem)
         }
         val folder = binary.toAbsolutePath().parent
         if (!isWritable(binary) || folder == null || !isWritable(folder)) {
-            return UpdateResult.Failed(
-                "yt-dlp at $binary is read-only for your user, so Jaitsizazu cannot update it. " +
-                    "Update it the way it was installed (for example, with your package manager), " +
-                    "or put a copy you can write to in the app's bin folder.",
-            )
+            return UpdateResult.Failed(Problem.ToolReadOnly(Tool.YT_DLP, binary.toString()))
         }
 
         val output = ArrayDeque<String>() // The runner calls back one line at a time.
@@ -44,29 +42,19 @@ class YtDlpUpdater(
                 }
             }
         } catch (e: IOException) {
-            return UpdateResult.Failed("Could not start yt-dlp ($binary): ${e.message}")
+            return UpdateResult.Failed(Problem.ToolDidNotStart(Tool.YT_DLP, binary.toString(), e.message))
         }
 
         if (outcome.exitCode == 0) {
             // The runner mixes stdout and stderr, so a warning may come after yt-dlp's own result line.
             val result = output.lastOrNull { it.startsWith("Updated yt-dlp") || it.startsWith("yt-dlp is up to date") }
-            return UpdateResult.Updated(result ?: unclearResult(output.lastOrNull()))
+            // No such line: yt-dlp did not say which version it has now, for example
+            // because a future release words it differently. The UI says what to do.
+            return result?.let(UpdateResult::Updated) ?: UpdateResult.Unclear(output.lastOrNull())
         }
         val details = outcome.stderrTail.ifBlank { output.joinToString("\n") }
-        val summary = "yt-dlp could not update itself (exit code ${outcome.exitCode})."
-        return UpdateResult.Failed(if (details.isBlank()) summary else "$summary\n$details")
+        return UpdateResult.Failed(Problem.UpdateFailed(outcome.exitCode, details))
     }
-
-    /**
-     * yt-dlp ended without an error but did not say which version it has now,
-     * for example because a future release words it differently. Says so,
-     * quotes [lastLine] when there is one, and what to do if downloads still fail.
-     */
-    private fun unclearResult(lastLine: String?): String =
-        "yt-dlp finished without saying which version it has now." +
-            (if (lastLine != null) " Its last message was: $lastLine" else "") +
-            "\nIf downloads still fail, click Update yt-dlp again. If that does not help, " +
-            "replace yt-dlp in the app's bin folder with the latest release from github.com/yt-dlp/yt-dlp."
 
     private companion object {
         const val KEPT_LINES = 5

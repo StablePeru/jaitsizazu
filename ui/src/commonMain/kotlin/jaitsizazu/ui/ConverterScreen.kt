@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import jaitsizazu.core.AudioFormat
+import jaitsizazu.core.Problem
 import jaitsizazu.core.fileNameOf
 
 /**
@@ -41,9 +42,7 @@ fun ConverterScreen(
     ) {
         Text("Convert an audio file", style = MaterialTheme.typography.h5)
 
-        state.setupWarning?.let { warning ->
-            SelectionContainer { Text(warning, color = MaterialTheme.colors.error) }
-        }
+        SetupWarnings(state.setupWarnings)
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onChooseFile, enabled = idle) { Text("Choose file") }
@@ -66,6 +65,14 @@ fun ConverterScreen(
     }
 }
 
+/** What a startup check found, each explained, as errors that do not block anything. */
+@Composable
+internal fun SetupWarnings(problems: List<Problem>) {
+    if (problems.isEmpty()) return
+    val text = problems.map { problemText(it) }.joinToString("\n\n")
+    SelectionContainer { Text(text, color = MaterialTheme.colors.error) }
+}
+
 @Composable
 private fun StatusLine(status: ConversionStatus) {
     when (status) {
@@ -78,7 +85,7 @@ private fun StatusLine(status: ConversionStatus) {
             }
         }
         is ConversionStatus.Failed -> SelectionContainer {
-            Text(status.reason, color = MaterialTheme.colors.error)
+            Text(failureText(status.problem, status.leftover), color = MaterialTheme.colors.error)
         }
         ConversionStatus.Cancelled -> Text("Conversion cancelled.")
     }

@@ -1,10 +1,11 @@
 package jaitsizazu.engine.desktop
 
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /**
  * Paths are written with forward slashes and always go through [Path.of],
@@ -47,9 +48,10 @@ class ToolLocatorTest {
             files = setOf("/usr/bin/ffmpeg"),
         ).locate()
 
-        assertIs<ToolLookup.NotFound>(result)
-        assertTrue("JAITSIZAZU_FFMPEG" in result.message)
-        assertTrue("/custom/ffmpeg" in result.message)
+        assertEquals(
+            ToolLookup.NotFound(Problem.ToolNotAtConfiguredPath(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "/custom/ffmpeg")),
+            result,
+        )
     }
 
     @Test
@@ -109,12 +111,8 @@ class ToolLocatorTest {
     fun explainsEveryOptionWhenNothingIsFound() {
         val result = locator(env = mapOf("PATH" to "/usr/bin"), appDirectory = "/opt/app").locate()
 
-        assertIs<ToolLookup.NotFound>(result)
-        assertTrue("PATH" in result.message)
-        assertTrue("JAITSIZAZU_FFMPEG" in result.message)
-        assertTrue("bin" in result.message)
-        // The converter looks for ffmpeg again on every conversion.
-        assertTrue("try again" in result.message, result.message)
+        // The UI explains every option from these: PATH, the variable and the app's bin folder.
+        assertEquals(ToolLookup.NotFound(Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg")), result)
     }
 
     @Test
@@ -152,10 +150,13 @@ class ToolLocatorTest {
     fun namesTheToolItsVariableAndWhyItIsNeeded() {
         val result = locator(env = mapOf("PATH" to "/usr/bin"), tool = ExternalTool.YT_DLP).locate()
 
-        assertIs<ToolLookup.NotFound>(result)
-        assertTrue(result.message.startsWith("yt-dlp was not found."), result.message)
-        assertTrue("JAITSIZAZU_YTDLP" in result.message, result.message)
-        assertTrue("bin/yt-dlp" in result.message, result.message)
-        assertTrue("download" in result.message, result.message)
+        assertEquals(ToolLookup.NotFound(Problem.ToolNotFound(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "bin/yt-dlp")), result)
+    }
+
+    @Test
+    fun namesTheBundledPathTheWindowsWay() {
+        val result = locator(isWindows = true, tool = ExternalTool.DENO).locate()
+
+        assertEquals(ToolLookup.NotFound(Problem.ToolNotFound(Tool.DENO, "JAITSIZAZU_DENO", "bin\\deno.exe")), result)
     }
 }

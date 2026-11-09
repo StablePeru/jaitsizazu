@@ -1,12 +1,13 @@
 package jaitsizazu.engine.desktop
 
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.core.UpdateResult
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class YtDlpUpdaterTest {
@@ -61,13 +62,9 @@ class YtDlpUpdaterTest {
         val silent = updater(FakeRunner()).update()
         val unclear = updater(FakeRunner(listOf("Current version: stable@2026.10.26", "WARNING: something unrelated"))).update()
 
-        for (result in listOf(silent, unclear)) {
-            assertIs<UpdateResult.Updated>(result)
-            assertTrue("up to date" !in result.message, "nothing said it is up to date: ${result.message}")
-            assertTrue("Update yt-dlp again" in result.message, result.message)
-        }
-        assertIs<UpdateResult.Updated>(unclear)
-        assertTrue("WARNING: something unrelated" in unclear.message, unclear.message)
+        // The UI says what to do next, and quotes the last line as it is.
+        assertEquals(UpdateResult.Unclear(lastLine = null), silent)
+        assertEquals(UpdateResult.Unclear(lastLine = "WARNING: something unrelated"), unclear)
     }
 
     @Test
@@ -78,8 +75,7 @@ class YtDlpUpdaterTest {
         val readOnlyFolder = updater(runner, writable = { it == binary }).update()
 
         for (result in listOf(readOnlyFile, readOnlyFolder)) {
-            assertIs<UpdateResult.Failed>(result)
-            assertTrue("read-only" in result.reason && binary.toString() in result.reason, result.reason)
+            assertEquals(UpdateResult.Failed(Problem.ToolReadOnly(Tool.YT_DLP, binary.toString())), result)
         }
         assertTrue(runner.commands.isEmpty())
     }
@@ -90,17 +86,19 @@ class YtDlpUpdaterTest {
 
         val result = updater(runner).update()
 
-        assertIs<UpdateResult.Failed>(result)
-        assertTrue("exit code 1" in result.reason && "Unable to download" in result.reason, result.reason)
+        assertEquals(UpdateResult.Failed(Problem.UpdateFailed(1, "ERROR: Unable to download latest version")), result)
     }
 
     @Test
     fun reportsAMissingYtDlpOrOneThatCannotStart() = runTest {
-        val missing = updater(FakeRunner(), lookup = ToolLookup.NotFound("yt-dlp was not found.")).update()
+        val notFound = Problem.ToolNotFound(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "bin/yt-dlp")
+        val missing = updater(FakeRunner(), lookup = ToolLookup.NotFound(notFound)).update()
         val broken = updater(FakeRunner(outcome = { throw IOException("error=13, Permission denied") })).update()
 
-        assertEquals(UpdateResult.Failed("yt-dlp was not found."), missing)
-        assertIs<UpdateResult.Failed>(broken)
-        assertTrue("Permission denied" in broken.reason, broken.reason)
+        assertEquals(UpdateResult.Failed(notFound), missing)
+        assertEquals(
+            UpdateResult.Failed(Problem.ToolDidNotStart(Tool.YT_DLP, binary.toString(), "error=13, Permission denied")),
+            broken,
+        )
     }
 }

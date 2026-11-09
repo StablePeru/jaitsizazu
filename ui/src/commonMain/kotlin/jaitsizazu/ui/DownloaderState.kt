@@ -2,12 +2,15 @@ package jaitsizazu.ui
 
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
+import jaitsizazu.core.Leftover
+import jaitsizazu.core.Problem
 
 /**
- * Everything the downloader screen shows. Plain Kotlin, no Compose types.
+ * Everything the downloader screen shows. Plain Kotlin, no Compose types and no
+ * texts: the screen puts problems into words in the app's language.
  *
- * [setupWarning] is set when a startup check found a problem (for example,
- * yt-dlp is missing) and explains how to fix it. Like the converter's, it does
+ * [setupWarnings] holds what a startup check found (for example, yt-dlp is
+ * missing); the screen explains how to fix each. Like the converter's, they do
  * not block downloading: the engine looks again on every download.
  */
 data class DownloaderState(
@@ -16,7 +19,7 @@ data class DownloaderState(
     val outputDirectory: String = "",
     val status: DownloadStatus = DownloadStatus.Idle,
     val update: UpdateStatus = UpdateStatus.Idle,
-    val setupWarning: String? = null,
+    val setupWarnings: List<Problem> = emptyList(),
 ) {
     /**
      * A download runs or is still stopping, or an update runs. They never run
@@ -39,7 +42,8 @@ sealed interface DownloadStatus {
     /** [progress] is null until the engine reports some. */
     data class Downloading(val progress: DownloadProgress? = null) : DownloadStatus
     data class Done(val outputPath: String) : DownloadStatus
-    data class Failed(val reason: String) : DownloadStatus
+    /** The download failed because of [problem]; [leftover] is what it could not remove. */
+    data class Failed(val problem: Problem, val leftover: Leftover? = null) : DownloadStatus
 
     /** The user stopped the download; the engine is still stopping yt-dlp and removing its partial files. */
     data object Cancelling : DownloadStatus
@@ -55,6 +59,11 @@ sealed interface DownloadStatus {
 sealed interface UpdateStatus {
     data object Idle : UpdateStatus
     data object Updating : UpdateStatus
-    data class Done(val message: String) : UpdateStatus
-    data class Failed(val reason: String) : UpdateStatus
+    /** [toolReport] is what yt-dlp said it did, as it said it. */
+    data class Done(val toolReport: String) : UpdateStatus
+
+    /** yt-dlp ended without an error but did not say which version it has; [lastLine] is its last line, raw. */
+    data class Unclear(val lastLine: String?) : UpdateStatus
+
+    data class Failed(val problem: Problem) : UpdateStatus
 }

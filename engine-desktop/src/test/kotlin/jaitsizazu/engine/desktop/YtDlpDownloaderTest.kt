@@ -4,7 +4,10 @@ import jaitsizazu.core.DownloadCancelledWithLeftovers
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.DownloadRequest
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -58,7 +61,7 @@ class YtDlpDownloaderTest {
 
     private fun downloader(
         runner: ProcessRunner,
-        deno: ToolLookup = ToolLookup.NotFound("deno was not found."),
+        deno: ToolLookup = ToolLookup.NotFound(Problem.ToolNotFound(Tool.DENO, "JAITSIZAZU_DENO", "bin/deno")),
         ytDlp: ToolLookup = ToolLookup.Found("/opt/yt-dlp"),
         ffmpeg: ToolLookup = ToolLookup.Found("/opt/ffmpeg"),
         createWorkDirectory: (Path) -> Path = { Files.createTempDirectory(it, YtDlpDownloader.WORK_DIRECTORY_PREFIX) },
@@ -125,11 +128,14 @@ class YtDlpDownloaderTest {
     fun reportsAMissingYtDlpOrFfmpegWithoutRunningAnything() = runTest {
         val runner = FakeYtDlp()
 
-        val noYtDlp = downloader(runner, ytDlp = ToolLookup.NotFound("yt-dlp was not found.")).download(request) {}
-        val noFfmpeg = downloader(runner, ffmpeg = ToolLookup.NotFound("ffmpeg was not found.")).download(request) {}
+        val missingYtDlp = ToolLookup.NotFound(Problem.ToolNotFound(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "bin/yt-dlp"))
+        val missingFfmpeg = ToolLookup.NotFound(Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg"))
 
-        assertEquals(MediaResult.Failure("yt-dlp was not found."), noYtDlp)
-        assertEquals(MediaResult.Failure("ffmpeg was not found."), noFfmpeg)
+        val noYtDlp = downloader(runner, ytDlp = missingYtDlp).download(request) {}
+        val noFfmpeg = downloader(runner, ffmpeg = missingFfmpeg).download(request) {}
+
+        assertEquals(MediaResult.Failure(missingYtDlp.problem), noYtDlp)
+        assertEquals(MediaResult.Failure(missingFfmpeg.problem), noFfmpeg)
         assertTrue(runner.commands.isEmpty())
     }
 
@@ -140,8 +146,7 @@ class YtDlpDownloaderTest {
 
         val result = downloader(runner).download(request) {}
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("already" in result.reason && "Clip [abc].mp3" in result.reason, result.reason)
+        assertEquals(MediaResult.Failure(Problem.AlreadyInFolder("Clip [abc].mp3", "Clip [abc].mp3")), result)
         assertEquals("an earlier download", saved.readText())
     }
 
@@ -154,8 +159,7 @@ class YtDlpDownloaderTest {
 
         val result = downloader(runner, isSameFile = caseInsensitive).download(request) {}
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("already" in result.reason && "Clip [abc].mp3" in result.reason, result.reason)
+        assertEquals(MediaResult.Failure(Problem.AlreadyInFolder("Clip [abc].mp3", "clip [ABC].mp3")), result)
         assertEquals("an earlier download", out.resolve("clip [ABC].mp3").readText())
     }
 
@@ -177,10 +181,11 @@ class YtDlpDownloaderTest {
 
         val result = downloader(runner).download(request) {}
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("exit code 1" in result.reason, result.reason)
-        assertTrue("Unsupported URL" in result.reason, result.reason)
-        assertTrue("jaitsizazu-" !in result.reason, "our own progress lines are not errors: ${result.reason}")
+        // Our own progress lines are not errors: they are left out of the tool output.
+        assertEquals(
+            MediaResult.Failure(Problem.DownloadFailed(1, "ERROR: Unsupported URL: https://example.org/clip")),
+            result,
+        )
         assertEquals(emptyList(), leftovers())
     }
 
@@ -188,8 +193,7 @@ class YtDlpDownloaderTest {
     fun reportsASuccessWithoutAFile() = runTest {
         val result = downloader(FakeYtDlp()).download(request) {}
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("no file" in result.reason, result.reason)
+        assertEquals(MediaResult.Failure(Problem.NoFileReported), result)
     }
 
     @Test
@@ -227,8 +231,7 @@ class YtDlpDownloaderTest {
 
         val result = downloader(runner, deleteRecursively = busyTwice).download(request) {}
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("could not be removed" !in result.reason, result.reason)
+        assertEquals(MediaResult.Failure(Problem.DownloadFailed(1, "ERROR: boom")), result)
         assertEquals(3, attempts)
         assertEquals(emptyList(), leftovers())
     }
@@ -241,8 +244,9 @@ class YtDlpDownloaderTest {
 
         assertIs<MediaResult.Failure>(result)
         val work = workDirectoryOf(runner.commands.single())
-        assertTrue("ERROR: boom" in result.reason, result.reason)
-        assertTrue("Some temporary files could not be removed: $work" in result.reason, result.reason)
+        assertEquals(Problem.DownloadFailed(1, "ERROR: boom"), result.problem)
+        val leftover = assertIs<Leftover.TemporaryFolder>(result.leftover)
+        assertEquals(work.toString(), leftover.path)
         assertEquals(3, deleteAttempts)
     }
 
@@ -296,7 +300,8 @@ class YtDlpDownloaderTest {
             .download(request) {}
 
         assertIs<MediaResult.Failure>(result)
-        assertTrue("Cannot save into $out" in result.reason, result.reason)
+        val problem = assertIs<Problem.CannotSaveInto>(result.problem)
+        assertEquals(out.toString(), problem.folder)
         assertTrue(runner.commands.isEmpty())
     }
 }

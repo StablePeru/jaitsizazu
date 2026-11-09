@@ -4,6 +4,7 @@ import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.ConvertMedia
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -40,7 +41,7 @@ class FfmpegIntegrationTest {
     fun setUp() = runBlocking {
         dir = Files.createTempDirectory("jaitsizazu-ffmpeg").toFile()
         val lookup = ToolLocator(ExternalTool.FFMPEG).locate()
-        if (lookup !is ToolLookup.Found) fail("These tests need ffmpeg. ${(lookup as ToolLookup.NotFound).message}")
+        if (lookup !is ToolLookup.Found) fail("These tests need ffmpeg. ${(lookup as ToolLookup.NotFound).problem}")
         ffmpeg = lookup
         converter = FfmpegConverter({ ffmpeg }, SystemProcessRunner())
 
@@ -193,6 +194,7 @@ class FfmpegIntegrationTest {
         val result = convertFile(playlist, AudioFormat.WAV, File(dir, "list.wav"))
 
         assertIs<MediaResult.Failure>(result)
-        assertTrue("not on whitelist 'file'" in result.reason, result.reason)
+        val problem = assertIs<Problem.ConversionFailed>(result.problem)
+        assertTrue("not on whitelist 'file'" in problem.toolOutput, problem.toolOutput)
     }
 }

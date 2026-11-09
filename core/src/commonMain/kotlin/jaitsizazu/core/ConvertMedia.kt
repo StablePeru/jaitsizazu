@@ -14,12 +14,12 @@ class ConvertMedia(
 ) {
     suspend operator fun invoke(request: ConversionRequest): MediaResult {
         val input = request.inputPath
-        if (input.isBlank()) return MediaResult.Failure("Choose a file to convert.")
-        if (fileNameOf(input).isBlank()) return MediaResult.Failure("$input is not a file.")
-        if (!exists(input)) return MediaResult.Failure("The file $input does not exist.")
+        if (input.isBlank()) return MediaResult.Failure(Problem.NoFileChosen)
+        if (fileNameOf(input).isBlank()) return MediaResult.Failure(Problem.NotAFile(input))
+        if (!exists(input)) return MediaResult.Failure(Problem.FileNotFound(input))
 
         val output = firstFreePath(outputPath(input, request.target), exists)
-            ?: return MediaResult.Failure("No free name left for the converted file next to $input.")
+            ?: return MediaResult.Failure(Problem.NoFreeName(input))
         return converter.convert(request, output)
     }
 }

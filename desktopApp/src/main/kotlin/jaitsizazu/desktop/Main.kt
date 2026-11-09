@@ -82,8 +82,8 @@ fun main() {
             val (ffmpeg, ytDlp, deno) = withContext(Dispatchers.IO) {
                 listOf(tools.ffmpeg.locate(), tools.ytDlp.locate(), tools.deno.locate())
             }
-            converter.showSetupWarning((ffmpeg as? ToolLookup.NotFound)?.message)
-            downloader.showSetupWarning(downloadSetupWarning(ytDlp, ffmpeg, deno))
+            converter.showSetupWarnings(listOfNotNull((ffmpeg as? ToolLookup.NotFound)?.problem))
+            downloader.showSetupWarnings(downloadSetupWarnings(ytDlp, ffmpeg, deno))
         }
 
         Window(onCloseRequest = ::exitApplication, title = APP_NAME) {

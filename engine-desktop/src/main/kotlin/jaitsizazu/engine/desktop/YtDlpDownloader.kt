@@ -3,8 +3,11 @@ package jaitsizazu.engine.desktop
 import jaitsizazu.core.DownloadCancelledWithLeftovers
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadRequest
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.MediaDownloader
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -35,7 +38,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * case: success, failure or cancellation. On Windows a file can stay locked for
  * a moment after its process exits, so the removal is tried [cleanupAttempts]
  * times, [cleanupRetryDelay] apart. A folder that still cannot be removed is
- * named in the failure reason, or, after a cancellation, through
+ * named as the failure's leftover, or, after a cancellation, through
  * [DownloadCancelledWithLeftovers].
  *
  * A file that was already in the output folder is never replaced. yt-dlp runs
@@ -65,11 +68,11 @@ class YtDlpDownloader(
     override suspend fun download(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit): MediaResult {
         val ytDlp = when (val lookup = locateYtDlp()) {
             is ToolLookup.Found -> lookup.path
-            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.message)
+            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.problem)
         }
         val ffmpeg = when (val lookup = locateFfmpeg()) {
             is ToolLookup.Found -> lookup.path
-            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.message)
+            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.problem)
         }
         val deno = (locateDeno() as? ToolLookup.Found)?.path
 
@@ -81,9 +84,9 @@ class YtDlpDownloader(
             entriesBefore = output.listDirectoryEntries()
             work = createWorkDirectory(output)
         } catch (e: IOException) {
-            return MediaResult.Failure("Cannot save into ${request.outputDirectory}: ${e.message ?: e::class.simpleName}")
+            return MediaResult.Failure(Problem.CannotSaveInto(request.outputDirectory, e.message ?: e::class.simpleName))
         } catch (e: InvalidPathException) {
-            return MediaResult.Failure("Cannot save into ${request.outputDirectory}: ${e.message}")
+            return MediaResult.Failure(Problem.CannotSaveInto(request.outputDirectory, e.message))
         }
 
         val saved = AtomicReference<String?>(null)
@@ -96,7 +99,7 @@ class YtDlpDownloader(
             }
         } catch (e: IOException) {
             val leftover = removeWorkDirectory(work)
-            return MediaResult.Failure("Could not start yt-dlp ($ytDlp): ${e.message}").withLeftover(work, leftover)
+            return MediaResult.Failure(Problem.ToolDidNotStart(Tool.YT_DLP, ytDlp, e.message)).withLeftover(work, leftover)
         } catch (e: CancellationException) {
             // The runner has killed yt-dlp and its children and waited for them to exit.
             val leftover = removeWorkDirectory(work) ?: throw e
@@ -112,21 +115,17 @@ class YtDlpDownloader(
 
     private fun result(outcome: ProcessOutcome, saved: String?, entriesBefore: List<Path>): MediaResult {
         if (outcome.exitCode != 0) {
-            val summary = "The download failed (yt-dlp exit code ${outcome.exitCode})."
             // In quiet mode yt-dlp writes some of the progress lines we asked for to stderr.
             val errors = outcome.stderrTail.lines().filterNot { it.startsWith(YtDlpOutput.PREFIX) }.joinToString("\n")
-            return MediaResult.Failure(if (errors.isBlank()) summary else "$summary\n$errors")
+            return MediaResult.Failure(Problem.DownloadFailed(outcome.exitCode, errors))
         }
-        if (saved == null) return MediaResult.Failure("yt-dlp finished, but it reported no file.")
+        if (saved == null) return MediaResult.Failure(Problem.NoFileReported)
         val savedPath = Path.of(saved)
         val name = savedPath.name
         // Only names that could be the same file on some file system are checked: it
         // saves asking the file system about every file in a large Downloads folder.
         val existing = entriesBefore.firstOrNull { sameNameIgnoringCase(it.name, name) && isSameFile(it, savedPath) }
-        if (existing != null) {
-            val spelling = if (existing.name == name) "" else ", as ${existing.name}"
-            return MediaResult.Failure("$name is already in this folder$spelling. Nothing was overwritten.")
-        }
+        if (existing != null) return MediaResult.Failure(Problem.AlreadyInFolder(name, existing.name))
         return MediaResult.Success(saved)
     }
 
@@ -153,11 +152,10 @@ class YtDlpDownloader(
 
     private fun MediaResult.withLeftover(work: Path, leftover: Exception?): MediaResult {
         if (leftover == null) return this
-        val note = "Some temporary files could not be removed: $work\n(${leftover.message}) You can delete that folder."
         return when (this) {
             // The download worked: its file is saved. A leftover work folder does not change that.
             is MediaResult.Success -> this
-            is MediaResult.Failure -> MediaResult.Failure("$reason\n$note")
+            is MediaResult.Failure -> copy(leftover = Leftover.TemporaryFolder(work.toString(), leftover.message))
         }
     }
 

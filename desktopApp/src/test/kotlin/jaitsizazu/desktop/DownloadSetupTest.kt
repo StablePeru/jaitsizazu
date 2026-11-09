@@ -1,11 +1,11 @@
 package jaitsizazu.desktop
 
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.engine.desktop.ToolLookup
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class DownloadSetupTest {
 
@@ -23,26 +23,27 @@ class DownloadSetupTest {
         assertEquals(Path.of("/home/me"), defaultDownloadDirectory(home = "/home/me", isDirectory = { false }))
     }
 
+    private val noYtDlp = Problem.ToolNotFound(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "bin/yt-dlp")
+    private val noDeno = Problem.ToolNotFound(Tool.DENO, "JAITSIZAZU_DENO", "bin/deno")
+
     @Test
     fun warnsAboutEveryMissingTool() {
-        val warning = downloadSetupWarning(
-            ytDlp = ToolLookup.NotFound("yt-dlp was not found."),
+        val warnings = downloadSetupWarnings(
+            ytDlp = ToolLookup.NotFound(noYtDlp),
             ffmpeg = found,
-            deno = ToolLookup.NotFound("deno was not found."),
+            deno = ToolLookup.NotFound(noDeno),
         )
 
-        assertEquals("yt-dlp was not found.\n\ndeno was not found.", warning)
+        assertEquals(listOf(noYtDlp, noDeno), warnings)
     }
 
     @Test
     fun saysNothingWhenEveryToolIsThere() {
-        assertNull(downloadSetupWarning(found, found, found))
+        assertEquals(emptyList(), downloadSetupWarnings(found, found, found))
     }
 
     @Test
     fun warnsWhenOnlyDenoIsMissing() {
-        val warning = downloadSetupWarning(found, found, ToolLookup.NotFound("deno was not found."))
-
-        assertTrue(warning != null && "deno was not found." in warning, "$warning")
+        assertEquals(listOf<Problem>(noDeno), downloadSetupWarnings(found, found, ToolLookup.NotFound(noDeno)))
     }
 }

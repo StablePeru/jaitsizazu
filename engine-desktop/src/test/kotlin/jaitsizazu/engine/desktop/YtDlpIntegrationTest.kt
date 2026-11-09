@@ -6,6 +6,8 @@ import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.DownloadRequest
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
+import jaitsizazu.core.Tool
 import jaitsizazu.core.UpdateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
@@ -56,14 +58,15 @@ class YtDlpIntegrationTest {
     private fun found(tool: ExternalTool): ToolLookup.Found =
         when (val lookup = ToolLocator(tool).locate()) {
             is ToolLookup.Found -> lookup
-            is ToolLookup.NotFound -> fail("These tests need ${tool.binaryName}. ${lookup.message}")
+            is ToolLookup.NotFound -> fail("These tests need ${tool.binaryName}. ${lookup.problem}")
         }
 
     @BeforeTest
     fun setUp() = runBlocking {
         val ffmpeg = found(ExternalTool.FFMPEG)
         ytDlp = found(ExternalTool.YT_DLP)
-        downloader = YtDlpDownloader({ ytDlp }, { ffmpeg }, { ToolLookup.NotFound("deno is not needed here.") }, SystemProcessRunner())
+        val noDeno = ToolLookup.NotFound(Problem.ToolNotFound(Tool.DENO, ExternalTool.DENO.envVar, "bin/deno"))
+        downloader = YtDlpDownloader({ ytDlp }, { ffmpeg }, { noDeno }, SystemProcessRunner())
 
         // A one-second video with sound, like a short clip on a website.
         val clip = dir.resolve("clip.mp4")
@@ -155,7 +158,7 @@ class YtDlpIntegrationTest {
         val second = download("/clip.mp4", DownloadQuality.VIDEO_MP4)
 
         assertIs<MediaResult.Failure>(second)
-        assertTrue("already in this folder" in second.reason, second.reason)
+        assertEquals(Problem.AlreadyInFolder(first.name, first.name), second.problem)
         assertTrue(before.contentEquals(first.readBytes()))
         assertEquals(listOf(first), out.listDirectoryEntries())
     }
@@ -202,8 +205,7 @@ class YtDlpIntegrationTest {
 
             val result = YtDlpUpdater({ ToolLookup.Found(copy.toString()) }, noNetwork).update()
 
-            assertIs<UpdateResult.Failed>(result)
-            assertTrue("read-only" in result.reason && copy.toString() in result.reason, result.reason)
+            assertEquals(UpdateResult.Failed(Problem.ToolReadOnly(Tool.YT_DLP, copy.toString())), result)
         } finally {
             file.setWritable(true, true)
         }

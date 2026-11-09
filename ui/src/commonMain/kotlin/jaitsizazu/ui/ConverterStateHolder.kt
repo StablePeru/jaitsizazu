@@ -4,6 +4,7 @@ import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.ConvertMedia
 import jaitsizazu.core.MediaResult
+import jaitsizazu.core.Problem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -47,9 +48,9 @@ class ConverterStateHolder(
         mutableState.update { it.copy(format = format, status = ConversionStatus.Idle) }
     }
 
-    /** Shows [message] as a warning that does not block converting, or clears it when null. */
-    fun showSetupWarning(message: String?) {
-        mutableState.update { it.copy(setupWarning = message) }
+    /** Shows [problems] as warnings that do not block converting, or clears them when empty. */
+    fun showSetupWarnings(problems: List<Problem>) {
+        mutableState.update { it.copy(setupWarnings = problems) }
     }
 
     fun convert() {
@@ -62,19 +63,19 @@ class ConverterStateHolder(
             val status = try {
                 when (val result = withContext(workContext) { convertMedia(ConversionRequest(file, current.format)) }) {
                     is MediaResult.Success -> ConversionStatus.Done(result.outputPath)
-                    is MediaResult.Failure -> ConversionStatus.Failed(result.reason)
+                    is MediaResult.Failure -> ConversionStatus.Failed(result.problem, result.leftover)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ConversionStatus.Failed("Unexpected error: ${e.message ?: e::class.simpleName}")
+                ConversionStatus.Failed(Problem.Unexpected(e.message ?: e::class.simpleName.orEmpty()))
             }
             // A result that arrives after cancel() must not replace the Cancelled status.
             ensureActive()
             mutableState.update {
                 // A conversion that worked proves ffmpeg is there after all.
-                val warning = if (status is ConversionStatus.Done) null else it.setupWarning
-                it.copy(status = status, setupWarning = warning)
+                val warnings = if (status is ConversionStatus.Done) emptyList() else it.setupWarnings
+                it.copy(status = status, setupWarnings = warnings)
             }
         }
     }

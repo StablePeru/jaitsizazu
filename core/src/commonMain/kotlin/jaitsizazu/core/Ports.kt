@@ -7,8 +7,11 @@ sealed interface MediaResult {
     /** The operation wrote its output to [outputPath]. */
     data class Success(val outputPath: String) : MediaResult
 
-    /** The operation failed. [reason] is meant for the user. */
-    data class Failure(val reason: String) : MediaResult
+    /**
+     * The operation failed because of [problem]. [leftover] names temporary
+     * output it could not remove, or is null when nothing was left behind.
+     */
+    data class Failure(val problem: Problem, val leftover: Leftover? = null) : MediaResult
 }
 
 /**
@@ -60,10 +63,18 @@ interface MediaDownloader {
 class DownloadCancelledWithLeftovers(val folder: String) :
     CancellationException("The download was cancelled, but $folder could not be removed.")
 
-/** Outcome of [DownloaderUpdater.update]. Both texts are meant for the user. */
+/** Outcome of [DownloaderUpdater.update]. */
 sealed interface UpdateResult {
-    data class Updated(val message: String) : UpdateResult
-    data class Failed(val reason: String) : UpdateResult
+    /** The engine updated itself, or was up to date. [toolReport] is its own line about it, raw. */
+    data class Updated(val toolReport: String) : UpdateResult
+
+    /**
+     * The engine ended without an error but did not say which version it has
+     * now. [lastLine] is the last thing it said, raw, or null.
+     */
+    data class Unclear(val lastLine: String?) : UpdateResult
+
+    data class Failed(val problem: Problem) : UpdateResult
 }
 
 /**

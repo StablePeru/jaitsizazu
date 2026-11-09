@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
+import jaitsizazu.core.Leftover
 import jaitsizazu.core.fileNameOf
 
 /** Shown on the download screen at all times. */
@@ -53,9 +54,7 @@ fun DownloaderScreen(
         Text("Download from a web address", style = MaterialTheme.typography.h5)
         Text(DOWNLOAD_LEGAL_NOTE, style = MaterialTheme.typography.body2)
 
-        state.setupWarning?.let { warning ->
-            SelectionContainer { Text(warning, color = MaterialTheme.colors.error) }
-        }
+        SetupWarnings(state.setupWarnings)
 
         OutlinedTextField(
             value = state.url,
@@ -108,7 +107,9 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
             Text("Saved as ${fileNameOf(status.outputPath)}")
             SelectionContainer { Text(status.outputPath, style = MaterialTheme.typography.body2) }
         }
-        is DownloadStatus.Failed -> SelectionContainer { Text(status.reason, color = MaterialTheme.colors.error) }
+        is DownloadStatus.Failed -> SelectionContainer {
+            Text(failureText(status.problem, status.leftover), color = MaterialTheme.colors.error)
+        }
         DownloadStatus.Cancelling -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Text("Cancelling…")
@@ -117,7 +118,7 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
             Text("Download cancelled.")
             status.leftoverFolder?.let { folder ->
                 SelectionContainer {
-                    Text("Some temporary files could not be removed: $folder", color = MaterialTheme.colors.error)
+                    Text(leftoverText(Leftover.TemporaryFolder(folder, detail = null)), color = MaterialTheme.colors.error)
                 }
             }
         }
@@ -135,8 +136,17 @@ private fun UpdateBlock(update: UpdateStatus, enabled: Boolean, onUpdate: () -> 
         when (update) {
             UpdateStatus.Idle -> Unit
             UpdateStatus.Updating -> Text("Updating yt-dlp…")
-            is UpdateStatus.Done -> SelectionContainer { Text(update.message) }
-            is UpdateStatus.Failed -> SelectionContainer { Text(update.reason, color = MaterialTheme.colors.error) }
+            is UpdateStatus.Done -> SelectionContainer { Text(update.toolReport) }
+            is UpdateStatus.Unclear -> SelectionContainer {
+                val lastLine = update.lastLine?.let { "Its last message was: $it" }
+                val unclear = "yt-dlp finished without saying which version it has now. " +
+                    "If downloads still fail, click Update yt-dlp again. If that does not help, " +
+                    "replace yt-dlp in the bin folder of the app with the latest release from github.com/yt-dlp/yt-dlp."
+                Text(listOfNotNull(unclear, lastLine).joinToString("\n"))
+            }
+            is UpdateStatus.Failed -> SelectionContainer {
+                Text(problemText(update.problem), color = MaterialTheme.colors.error)
+            }
         }
     }
 }
