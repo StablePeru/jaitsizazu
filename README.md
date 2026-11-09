@@ -69,6 +69,26 @@ HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose build build
 
 The variables are called `HOST_UID` and `HOST_GID` because bash does not let you set `UID`. On Windows and macOS with Docker Desktop you can skip this.
 
+### Portable Windows build (for testing)
+
+This builds a Windows x64 folder that runs without installing anything. It is a test build, not an installer.
+
+```sh
+docker compose build build
+docker compose run --rm build bash scripts/package-windows.sh
+```
+
+The result is `dist/jaitsizazu-windows-x64/` and `dist/jaitsizazu-windows-x64.zip`. Copy the folder to Windows and double-click `Jaitsizazu.bat`.
+
+| Folder or file | Content |
+|----------------|---------|
+| `app/` | The app JARs, built for Windows x64. |
+| `runtime/` | Eclipse Temurin 21 JRE for Windows x64. |
+| `bin/ffmpeg.exe` | FFmpeg GPL static build for Windows x64. |
+| `THIRD-PARTY.txt`, `licenses/` | Third-party versions, sources and licenses. |
+
+The script pins the Temurin and FFmpeg versions at its top, downloads them over HTTPS and stops if a SHA-256 does not match the pinned value or the publisher's checksum file. `-Pjaitsizazu.desktopTarget=windows-x64` is what makes Gradle use the Windows Skiko runtime from the Linux container.
+
 ## Architecture
 
 Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` use case and two ports, `MediaConverter` and `MediaDownloader`. Each platform plugs in an engine adapter: on desktop it runs ffmpeg as a subprocess today, and will run yt-dlp and Deno the same way; on Android it will use youtubedl-android. The shared Compose UI only talks to the use cases.

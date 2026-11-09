@@ -3,6 +3,9 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# Portable packages (scripts/package-windows.sh)
+/dist/
+
 # Kotlin
 .kotlin/
 *.hprof

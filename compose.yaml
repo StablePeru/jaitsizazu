@@ -1,4 +1,5 @@
 # Usage: docker compose run --rm build ./gradlew check
+#        docker compose run --rm build bash scripts/package-windows.sh
 services:
   build:
     build:

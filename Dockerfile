@@ -3,8 +3,9 @@
 FROM eclipse-temurin:21.0.13_9-jdk-noble
 
 # ffmpeg from Ubuntu: the engine-desktop integration tests run it for real.
+# file, unzip and zip: scripts/package-windows.sh (curl is in the base image).
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ffmpeg \
+    && apt-get install --yes --no-install-recommends ffmpeg file unzip zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Run as a non-root user. UID/GID default to 1000 so that files written
