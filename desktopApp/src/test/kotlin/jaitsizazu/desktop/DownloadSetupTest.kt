@@ -40,7 +40,7 @@ class DownloadSetupTest {
     }
 
     @Test
-    fun saysThatOnlyYouTubeNeedsDeno() {
+    fun warnsWhenOnlyDenoIsMissing() {
         val warning = downloadSetupWarning(found, found, ToolLookup.NotFound("deno was not found."))
 
         assertTrue(warning != null && "deno was not found." in warning, "$warning")

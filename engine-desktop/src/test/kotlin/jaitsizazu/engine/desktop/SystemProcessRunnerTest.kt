@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -88,6 +89,34 @@ class SystemProcessRunnerTest {
         companion object {
             const val KILLED = 137
         }
+    }
+
+    /** A process that has already exited after writing [stdout] and [stderr]. */
+    private class FinishedProcess(stdout: String, stderr: String) : Process() {
+        private val out = ByteArrayInputStream(stdout.toByteArray())
+        private val err = ByteArrayInputStream(stderr.toByteArray())
+
+        override fun getOutputStream(): OutputStream = OutputStream.nullOutputStream()
+        override fun getInputStream(): InputStream = out
+        override fun getErrorStream(): InputStream = err
+        override fun waitFor(): Int = 1
+        override fun exitValue(): Int = 1
+        override fun isAlive(): Boolean = false
+        override fun destroy() = Unit
+    }
+
+    @Test
+    fun passesLongLinesWholeToTheCallbackButBoundsTheStderrTail() = runBlocking {
+        val longError = "ERROR: " + "x".repeat(20_000)
+        val longPath = "jaitsizazu-saved /" + "d/".repeat(6_000) + "clip.mp4"
+        val lines = mutableListOf<String>()
+        val runner = SystemProcessRunner(startProcess = { FinishedProcess("$longPath\n", "$longError\n") })
+
+        val outcome = runner.run(listOf("ignored")) { lines += it }
+
+        assertEquals(setOf(longPath, longError), lines.toSet(), "the callback got cut lines")
+        assertTrue(outcome.stderrTail.startsWith("ERROR: xxx"), outcome.stderrTail.take(100))
+        assertTrue(outcome.stderrTail.length < longError.length, "the stderr tail keeps whole long lines")
     }
 
     private suspend fun cancelWhileWaiting(process: SlowToDieProcess, runner: SystemProcessRunner) =

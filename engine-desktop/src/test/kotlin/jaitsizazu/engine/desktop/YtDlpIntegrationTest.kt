@@ -184,17 +184,29 @@ class YtDlpIntegrationTest {
     }
 
     @Test
-    fun refusesToUpdateTheReadOnlyYtDlpOfTheBuildImage() = runBlocking {
+    fun refusesToUpdateAReadOnlyYtDlp() = runBlocking {
         val noNetwork = object : ProcessRunner {
             override suspend fun run(command: List<String>, onOutputLine: ((String) -> Unit)?): ProcessOutcome =
                 fail("The update must be refused before yt-dlp runs.")
         }
-        assertTrue(!Files.isWritable(Path.of(ytDlp.path)), "the build image installs yt-dlp read-only")
+        // A read-only copy in a folder of this test, so it does not depend on
+        // who owns the yt-dlp that the environment installed.
+        val bin = dir.resolve("bin").createDirectory()
+        val copy = Files.copy(Path.of(ytDlp.path), bin.resolve("yt-dlp"))
+        val file = copy.toFile()
+        file.setExecutable(true)
+        file.setWritable(false, false)
+        try {
+            // Root can write to any file, so this test needs a normal user, like the build image's.
+            assertTrue(!Files.isWritable(copy), "run the tests as a non-root user: root can write to read-only files")
 
-        val result = YtDlpUpdater({ ytDlp }, noNetwork).update()
+            val result = YtDlpUpdater({ ToolLookup.Found(copy.toString()) }, noNetwork).update()
 
-        assertIs<UpdateResult.Failed>(result)
-        assertTrue("read-only" in result.reason, result.reason)
+            assertIs<UpdateResult.Failed>(result)
+            assertTrue("read-only" in result.reason && copy.toString() in result.reason, result.reason)
+        } finally {
+            file.setWritable(true, true)
+        }
     }
 
     private companion object {

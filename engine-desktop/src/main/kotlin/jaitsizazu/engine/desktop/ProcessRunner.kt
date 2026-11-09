@@ -30,7 +30,9 @@ interface ProcessRunner {
 /**
  * [ProcessRunner] on [ProcessBuilder]. It runs on [dispatcher], off the main thread,
  * and reads stdout and stderr to the end so a chatty process cannot block on a
- * full pipe. Only the last [maxStderrLines] stderr lines are kept.
+ * full pipe. The line callback gets every line whole, whatever its length.
+ * Only the last [maxStderrLines] stderr lines are kept for [ProcessOutcome.stderrTail],
+ * each cut to a bounded length, so the memory held after a line is passed on stays small.
  *
  * Cancelling the coroutine kills the process and every process it started
  * (yt-dlp, for example, runs as a launcher plus a child, and starts ffmpeg),
@@ -56,7 +58,7 @@ class SystemProcessRunner(
                     launch { readStdout(process, forward) }
                     val tail = async {
                         process.errorStream.bufferedReader().useLines { lines ->
-                            lastLines(if (forward == null) lines else lines.onEach { forward(it.take(MAX_LINE_LENGTH)) })
+                            lastLines(if (forward == null) lines else lines.onEach(forward))
                         }
                     }
                     val exitCode = try {
@@ -86,7 +88,7 @@ class SystemProcessRunner(
             process.inputStream.use { it.copyTo(OutputStream.nullOutputStream()) }
         } else {
             process.inputStream.bufferedReader().useLines { lines ->
-                lines.forEach { onOutputLine(it.take(MAX_STDOUT_LINE_LENGTH)) }
+                lines.forEach(onOutputLine)
             }
         }
     }
@@ -121,15 +123,16 @@ class SystemProcessRunner(
         val tail = ArrayDeque<String>(maxStderrLines)
         for (line in lines) {
             if (tail.size == maxStderrLines) tail.removeFirst()
-            tail.addLast(line.take(MAX_LINE_LENGTH))
+            tail.addLast(if (line.length > MAX_TAIL_LINE_LENGTH) line.take(MAX_TAIL_LINE_LENGTH) + "…" else line)
         }
         return tail.joinToString("\n")
     }
 
     private companion object {
-        const val MAX_LINE_LENGTH = 500
-
-        /** Long enough for a full file path, which a stdout line may carry. */
-        const val MAX_STDOUT_LINE_LENGTH = 8192
+        /**
+         * The longest stderr line the tail keeps whole, so the tail stays small.
+         * Long enough for an error message with a long web address in it.
+         */
+        const val MAX_TAIL_LINE_LENGTH = 2000
     }
 }

@@ -57,6 +57,20 @@ class YtDlpUpdaterTest {
     }
 
     @Test
+    fun saysWhatToDoWhenYtDlpDoesNotNameItsVersion() = runTest {
+        val silent = updater(FakeRunner()).update()
+        val unclear = updater(FakeRunner(listOf("Current version: stable@2026.10.26", "WARNING: something unrelated"))).update()
+
+        for (result in listOf(silent, unclear)) {
+            assertIs<UpdateResult.Updated>(result)
+            assertTrue("up to date" !in result.message, "nothing said it is up to date: ${result.message}")
+            assertTrue("Update yt-dlp again" in result.message, result.message)
+        }
+        assertIs<UpdateResult.Updated>(unclear)
+        assertTrue("WARNING: something unrelated" in unclear.message, unclear.message)
+    }
+
+    @Test
     fun refusesAReadOnlyBinaryOrFolderWithoutRunningIt() = runTest {
         val runner = FakeRunner()
 

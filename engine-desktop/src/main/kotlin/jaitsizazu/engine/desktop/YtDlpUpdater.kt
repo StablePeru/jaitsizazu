@@ -50,12 +50,23 @@ class YtDlpUpdater(
         if (outcome.exitCode == 0) {
             // The runner mixes stdout and stderr, so a warning may come after yt-dlp's own result line.
             val result = output.lastOrNull { it.startsWith("Updated yt-dlp") || it.startsWith("yt-dlp is up to date") }
-            return UpdateResult.Updated(result ?: output.lastOrNull() ?: "yt-dlp is up to date.")
+            return UpdateResult.Updated(result ?: unclearResult(output.lastOrNull()))
         }
         val details = outcome.stderrTail.ifBlank { output.joinToString("\n") }
         val summary = "yt-dlp could not update itself (exit code ${outcome.exitCode})."
         return UpdateResult.Failed(if (details.isBlank()) summary else "$summary\n$details")
     }
+
+    /**
+     * yt-dlp ended without an error but did not say which version it has now,
+     * for example because a future release words it differently. Says so,
+     * quotes [lastLine] when there is one, and what to do if downloads still fail.
+     */
+    private fun unclearResult(lastLine: String?): String =
+        "yt-dlp finished without saying which version it has now." +
+            (if (lastLine != null) " Its last message was: $lastLine" else "") +
+            "\nIf downloads still fail, click Update yt-dlp again. If that does not help, " +
+            "replace yt-dlp in the app's bin folder with the latest release from github.com/yt-dlp/yt-dlp."
 
     private companion object {
         const val KEPT_LINES = 5

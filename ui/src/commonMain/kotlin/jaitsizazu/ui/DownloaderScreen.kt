@@ -109,7 +109,18 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
             SelectionContainer { Text(status.outputPath, style = MaterialTheme.typography.body2) }
         }
         is DownloadStatus.Failed -> SelectionContainer { Text(status.reason, color = MaterialTheme.colors.error) }
-        DownloadStatus.Cancelled -> Text("Download cancelled.")
+        DownloadStatus.Cancelling -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Text("Cancelling…")
+        }
+        is DownloadStatus.Cancelled -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Download cancelled.")
+            status.leftoverFolder?.let { folder ->
+                SelectionContainer {
+                    Text("Some temporary files could not be removed: $folder", color = MaterialTheme.colors.error)
+                }
+            }
+        }
     }
 }
 

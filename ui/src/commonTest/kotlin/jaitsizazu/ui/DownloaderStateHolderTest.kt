@@ -1,5 +1,6 @@
 package jaitsizazu.ui
 
+import jaitsizazu.core.DownloadCancelledWithLeftovers
 import jaitsizazu.core.DownloadMedia
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
@@ -8,21 +9,33 @@ import jaitsizazu.core.DownloaderUpdater
 import jaitsizazu.core.MediaDownloader
 import jaitsizazu.core.MediaResult
 import jaitsizazu.core.UpdateResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
-@OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle
+@OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle, advanceTimeBy, runCurrent
 class DownloaderStateHolderTest {
+
+    private companion object {
+        /** How long [SlowToStopDownloader] needs to stop once cancelled. */
+        val stopTime = 5.seconds
+    }
 
     /** Reports [progress], then waits for [gate] before answering. */
     private class FakeDownloader(
@@ -51,6 +64,30 @@ class DownloaderStateHolderTest {
                 awaitCancellation()
             } finally {
                 cancelled = true
+            }
+        }
+    }
+
+    /**
+     * Once cancelled, needs [stopTime] (of virtual time) to stop, like yt-dlp
+     * on Windows while its processes exit. Then reports [leftoverFolder], if
+     * set, as a temporary folder it could not remove.
+     */
+    private class SlowToStopDownloader(
+        private val leftoverFolder: String? = null,
+    ) : MediaDownloader {
+        var onProgress: ((DownloadProgress) -> Unit)? = null
+        var finished = false
+
+        override suspend fun download(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit): MediaResult {
+            this.onProgress = onProgress
+            try {
+                awaitCancellation()
+            } catch (e: CancellationException) {
+                withContext(NonCancellable) { delay(stopTime) }
+                finished = true
+                if (leftoverFolder != null) throw DownloadCancelledWithLeftovers(leftoverFolder)
+                throw e
             }
         }
     }
@@ -187,8 +224,116 @@ class DownloaderStateHolderTest {
         downloader.onProgress?.invoke(DownloadProgress.Downloading(99.0, null, null))
 
         assertTrue(downloader.cancelled)
-        assertEquals(DownloadStatus.Cancelled, holder.state.value.status)
+        assertEquals(DownloadStatus.Cancelled(), holder.state.value.status)
         assertTrue(holder.state.value.canDownload)
+    }
+
+    @Test
+    fun staysCancellingAndBlocksEverythingUntilTheDownloadHasStopped() = runTest {
+        val downloader = SlowToStopDownloader()
+        val updater = FakeUpdater()
+        val holder = holder(downloader, updater)
+        holder.setUrl(url)
+        holder.download()
+        advanceUntilIdle()
+
+        holder.cancel()
+        runCurrent()
+        assertEquals(DownloadStatus.Cancelling, holder.state.value.status)
+        assertFalse(holder.state.value.canDownload)
+        assertFalse(holder.state.value.canUpdate)
+        holder.updateDownloader()
+        holder.download()
+        holder.setUrl("https://example.org/other")
+        advanceTimeBy(stopTime / 2)
+        assertEquals(0, updater.calls, "yt-dlp must not be replaced while it may still run")
+        assertEquals(DownloadStatus.Cancelling, holder.state.value.status)
+        assertEquals(url, holder.state.value.url)
+        assertFalse(downloader.finished)
+
+        advanceUntilIdle()
+        assertTrue(downloader.finished)
+        assertEquals(DownloadStatus.Cancelled(), holder.state.value.status)
+        assertTrue(holder.state.value.canUpdate)
+        holder.updateDownloader()
+        advanceUntilIdle()
+        assertEquals(1, updater.calls)
+    }
+
+    @Test
+    fun ignoresProgressThatArrivesWhileCancellingOrAfterTheEnd() = runTest {
+        val downloader = SlowToStopDownloader()
+        val holder = holder(downloader)
+        holder.setUrl(url)
+        holder.download()
+        advanceUntilIdle()
+        val lateProgress = DownloadProgress.Downloading(99.0, null, null)
+
+        holder.cancel()
+        runCurrent()
+        downloader.onProgress?.invoke(lateProgress)
+        assertEquals(DownloadStatus.Cancelling, holder.state.value.status)
+
+        advanceUntilIdle()
+        downloader.onProgress?.invoke(lateProgress)
+        assertEquals(DownloadStatus.Cancelled(), holder.state.value.status)
+    }
+
+    @Test
+    fun ignoresProgressFromAnEarlierDownloadInTheNextOne() = runTest {
+        val first = SlowToStopDownloader()
+        val second = FakeDownloader(CompletableDeferred())
+        var calls = 0
+        val oneThenTheOther = object : MediaDownloader {
+            override suspend fun download(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit): MediaResult =
+                if (calls++ == 0) first.download(request, onProgress) else second.download(request, onProgress)
+        }
+        val holder = holder(oneThenTheOther)
+        holder.setUrl(url)
+        holder.download()
+        advanceUntilIdle()
+        holder.cancel()
+        advanceUntilIdle()
+
+        holder.download()
+        advanceUntilIdle()
+        first.onProgress?.invoke(DownloadProgress.Downloading(99.0, null, null))
+
+        assertEquals(DownloadStatus.Downloading(), holder.state.value.status)
+        holder.cancel()
+    }
+
+    @Test
+    fun ignoresProgressThatArrivesAfterTheResult() = runTest {
+        var report: ((DownloadProgress) -> Unit)? = null
+        val downloader = object : MediaDownloader {
+            override suspend fun download(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit): MediaResult {
+                report = onProgress
+                return MediaResult.Success("${request.outputDirectory}/clip.mp3")
+            }
+        }
+        val holder = holder(downloader)
+        holder.setUrl(url)
+        holder.download()
+        advanceUntilIdle()
+
+        report?.invoke(DownloadProgress.Processing)
+
+        assertEquals(DownloadStatus.Done("$downloads/clip.mp3"), holder.state.value.status)
+    }
+
+    @Test
+    fun saysWhichTemporaryFolderACancelledDownloadLeftBehind() = runTest {
+        val folder = "$downloads/.jaitsizazu-123"
+        val holder = holder(SlowToStopDownloader(leftoverFolder = folder))
+        holder.setUrl(url)
+        holder.download()
+        advanceUntilIdle()
+
+        holder.cancel()
+        advanceUntilIdle()
+
+        assertEquals(DownloadStatus.Cancelled(leftoverFolder = folder), holder.state.value.status)
     }
 
     @Test

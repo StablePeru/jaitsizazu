@@ -18,9 +18,13 @@ data class DownloaderState(
     val update: UpdateStatus = UpdateStatus.Idle,
     val setupWarning: String? = null,
 ) {
-    /** A download or an update runs. They never run together: an update replaces the engine. */
+    /**
+     * A download runs or is still stopping, or an update runs. They never run
+     * together: an update replaces the engine.
+     */
     val isBusy: Boolean
-        get() = status is DownloadStatus.Downloading || update == UpdateStatus.Updating
+        get() = status is DownloadStatus.Downloading || status == DownloadStatus.Cancelling ||
+            update == UpdateStatus.Updating
 
     val canDownload: Boolean
         get() = url.isNotBlank() && !isBusy
@@ -37,8 +41,14 @@ sealed interface DownloadStatus {
     data class Done(val outputPath: String) : DownloadStatus
     data class Failed(val reason: String) : DownloadStatus
 
-    /** The user stopped the download; the engine removes its partial files. */
-    data object Cancelled : DownloadStatus
+    /** The user stopped the download; the engine is still stopping yt-dlp and removing its partial files. */
+    data object Cancelling : DownloadStatus
+
+    /**
+     * The download has fully stopped. [leftoverFolder] holds the temporary
+     * folder the engine could not remove, or null when it removed everything.
+     */
+    data class Cancelled(val leftoverFolder: String? = null) : DownloadStatus
 }
 
 /** The "Update yt-dlp" action. */

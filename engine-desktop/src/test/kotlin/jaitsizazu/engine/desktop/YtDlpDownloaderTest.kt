@@ -1,5 +1,6 @@
 package jaitsizazu.engine.desktop
 
+import jaitsizazu.core.DownloadCancelledWithLeftovers
 import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.DownloadRequest
@@ -9,6 +10,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.nio.file.AccessDeniedException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
@@ -21,8 +23,10 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(kotlin.io.path.ExperimentalPathApi::class)
 class YtDlpDownloaderTest {
 
     private val out: Path = createTempDirectory("jaitsizazu-downloads")
@@ -31,7 +35,6 @@ class YtDlpDownloaderTest {
     private val progress = mutableListOf<DownloadProgress>()
 
     @AfterTest
-    @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     fun tearDown() {
         out.deleteRecursively()
     }
@@ -58,11 +61,25 @@ class YtDlpDownloaderTest {
         deno: ToolLookup = ToolLookup.NotFound("deno was not found."),
         ytDlp: ToolLookup = ToolLookup.Found("/opt/yt-dlp"),
         ffmpeg: ToolLookup = ToolLookup.Found("/opt/ffmpeg"),
-        createWorkDirectory: ((Path) -> Path)? = null,
-    ) = if (createWorkDirectory == null) {
-        YtDlpDownloader({ ytDlp }, { ffmpeg }, { deno }, runner)
-    } else {
-        YtDlpDownloader({ ytDlp }, { ffmpeg }, { deno }, runner, createWorkDirectory)
+        createWorkDirectory: (Path) -> Path = { Files.createTempDirectory(it, YtDlpDownloader.WORK_DIRECTORY_PREFIX) },
+        // Case-sensitive, like Linux, whatever the host. The integration tests use the real check.
+        isSameFile: (Path, Path) -> Boolean = { a, b -> a.toString() == b.toString() },
+        deleteRecursively: (Path) -> Unit = { it.deleteRecursively() },
+    ) = YtDlpDownloader(
+        { ytDlp }, { ffmpeg }, { deno }, runner,
+        createWorkDirectory = createWorkDirectory,
+        isSameFile = isSameFile,
+        deleteRecursively = deleteRecursively,
+    )
+
+    /** Plays a case-insensitive file system, such as NTFS on Windows or APFS on macOS, on any host. */
+    private val caseInsensitive: (Path, Path) -> Boolean = { a, b -> a.toString().equals(b.toString(), ignoreCase = true) }
+
+    /** A delete that always fails, like Windows while a process still holds a file. */
+    private var deleteAttempts = 0
+    private val lockedDelete: (Path) -> Unit = {
+        deleteAttempts++
+        throw FileSystemException(it.toString(), null, "The process cannot access the file")
     }
 
     /** The temporary folder that the command hands to yt-dlp. */
@@ -129,6 +146,29 @@ class YtDlpDownloaderTest {
     }
 
     @Test
+    fun saysSoWhenTheFileWasAlreadyThereUnderAnotherCase() = runTest {
+        // On a case-insensitive file system yt-dlp sees this file, keeps it,
+        // and still names the saved file in its own spelling.
+        out.resolve("clip [ABC].mp3").writeText("an earlier download")
+        val runner = FakeYtDlp(lines = listOf("jaitsizazu-saved $saved"))
+
+        val result = downloader(runner, isSameFile = caseInsensitive).download(request) {}
+
+        assertIs<MediaResult.Failure>(result)
+        assertTrue("already" in result.reason && "Clip [abc].mp3" in result.reason, result.reason)
+        assertEquals("an earlier download", out.resolve("clip [ABC].mp3").readText())
+    }
+
+    @Test
+    fun acceptsANewFileWhoseNameDiffersOnlyInCaseOnACaseSensitiveFileSystem() = runTest {
+        out.resolve("clip [ABC].mp3").writeText("another file")
+
+        val result = downloader(savesTheClip).download(request, progress::add)
+
+        assertEquals(MediaResult.Success(saved.toString()), result)
+    }
+
+    @Test
     fun reportsAFailureWithTheStderrTailAndCleansUp() = runTest {
         val stderr = "jaitsizazu-processing started FFmpegExtractAudio\nERROR: Unsupported URL: https://example.org/clip"
         val runner = FakeYtDlp(exitCode = 1, stderr = stderr, act = { command ->
@@ -174,6 +214,78 @@ class YtDlpDownloaderTest {
 
         assertIs<CancellationException>(thrown)
         assertEquals(emptyList(), leftovers())
+    }
+
+    @Test
+    fun retriesRemovingTheWorkFolderBeforeGivingUp() = runTest {
+        var attempts = 0
+        val busyTwice: (Path) -> Unit = {
+            if (++attempts < 3) throw FileSystemException(it.toString(), null, "in use")
+            it.deleteRecursively()
+        }
+        val runner = FakeYtDlp(exitCode = 1, stderr = "ERROR: boom")
+
+        val result = downloader(runner, deleteRecursively = busyTwice).download(request) {}
+
+        assertIs<MediaResult.Failure>(result)
+        assertTrue("could not be removed" !in result.reason, result.reason)
+        assertEquals(3, attempts)
+        assertEquals(emptyList(), leftovers())
+    }
+
+    @Test
+    fun namesTheTemporaryFolderItCouldNotRemoveAfterAFailure() = runTest {
+        val runner = FakeYtDlp(exitCode = 1, stderr = "ERROR: boom")
+
+        val result = downloader(runner, deleteRecursively = lockedDelete).download(request) {}
+
+        assertIs<MediaResult.Failure>(result)
+        val work = workDirectoryOf(runner.commands.single())
+        assertTrue("ERROR: boom" in result.reason, result.reason)
+        assertTrue("Some temporary files could not be removed: $work" in result.reason, result.reason)
+        assertEquals(3, deleteAttempts)
+    }
+
+    @Test
+    fun namesTheTemporaryFolderItCouldNotRemoveAfterACancellation() = runTest {
+        val runner = FakeYtDlp(act = { awaitCancellation() })
+        var thrown: Throwable? = null
+
+        val job = launch {
+            try {
+                downloader(runner, deleteRecursively = lockedDelete).download(request) {}
+            } catch (e: CancellationException) {
+                thrown = e
+                throw e
+            }
+        }
+        testScheduler.advanceUntilIdle()
+        job.cancel()
+        job.join()
+
+        val leftover = assertIs<DownloadCancelledWithLeftovers>(thrown)
+        assertEquals(workDirectoryOf(runner.commands.single()).toString(), leftover.folder)
+        assertIs<FileSystemException>(leftover.suppressed.single())
+        assertEquals(3, deleteAttempts)
+    }
+
+    @Test
+    fun rethrowsThePlainCancellationWhenItCleanedUp() = runTest {
+        var thrown: Throwable? = null
+        val job = launch {
+            try {
+                downloader(FakeYtDlp(act = { awaitCancellation() })).download(request) {}
+            } catch (e: CancellationException) {
+                thrown = e
+                throw e
+            }
+        }
+        testScheduler.advanceUntilIdle()
+        job.cancel()
+        job.join()
+
+        assertIs<CancellationException>(thrown)
+        assertNull(thrown as? DownloadCancelledWithLeftovers)
     }
 
     @Test
