@@ -32,6 +32,7 @@ import jaitsizazu.ui.resources.change_folder
 import jaitsizazu.ui.resources.download_button
 import jaitsizazu.ui.resources.download_cancelled
 import jaitsizazu.ui.resources.download_title
+import jaitsizazu.ui.resources.fixed_folder
 import jaitsizazu.ui.resources.legal_note
 import jaitsizazu.ui.resources.no_folder_chosen
 import jaitsizazu.ui.resources.save_as
@@ -50,13 +51,16 @@ import org.jetbrains.compose.resources.stringResource
  * through the callbacks. The caller owns the state and the folder chooser.
  * While a download runs, a Cancel button reports [onCancel]. The legal note
  * is always shown.
+ *
+ * [onChooseFolder] null means the folder is fixed (on Android): there is no
+ * button to change it, and the screen says where files go.
  */
 @Composable
 fun DownloaderScreen(
     state: DownloaderState,
     onUrlChange: (String) -> Unit,
     onQualitySelected: (DownloadQuality) -> Unit,
-    onChooseFolder: () -> Unit,
+    onChooseFolder: (() -> Unit)?,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onUpdate: () -> Unit,
@@ -92,13 +96,17 @@ fun DownloaderScreen(
             hint = { qualityHint(it) },
         )
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onChooseFolder, enabled = idle) { Text(stringResource(Res.string.change_folder)) }
-            Text(
-                text = state.outputDirectory.ifBlank { stringResource(Res.string.no_folder_chosen) },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (onChooseFolder != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onChooseFolder, enabled = idle) { Text(stringResource(Res.string.change_folder)) }
+                Text(
+                    text = state.outputDirectory.ifBlank { stringResource(Res.string.no_folder_chosen) },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            Text(stringResource(Res.string.fixed_folder, state.outputDirectory))
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

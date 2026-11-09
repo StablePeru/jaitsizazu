@@ -12,6 +12,7 @@ import jaitsizazu.ui.ConverterState
 import jaitsizazu.ui.DownloadStatus
 import jaitsizazu.ui.DownloaderScreen
 import jaitsizazu.ui.DownloaderState
+import jaitsizazu.ui.UpdateStatus
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 import java.util.Locale
@@ -57,6 +58,45 @@ class ScreenLanguageTest {
         onNodeWithText("Download from a web address").assertExists()
         onNodeWithText("Audio (original, as the site serves it)").assertExists()
         onNodeWithText("The download failed (yt-dlp exit code 1).\nERROR: Unsupported URL").assertExists()
+    }
+
+    @Test
+    fun theDesktopDownloadScreenOffersToChangeTheFolder() = runComposeUiTest {
+        useAppLanguage(AppLanguage.ENGLISH)
+        setContent { MaterialTheme { DownloaderScreen(failed, {}, {}, onChooseFolder = {}, {}, {}, {}) } }
+
+        onNodeWithText("Change folder").assertExists()
+        onNodeWithText("/home/me/Downloads").assertExists()
+    }
+
+    @Test
+    fun aFixedFolderHasNoButtonAndIsNamed() = runComposeUiTest {
+        useAppLanguage(AppLanguage.ENGLISH)
+        val android = failed.copy(outputDirectory = "Download/Jaitsizazu")
+        setContent { MaterialTheme { DownloaderScreen(android, {}, {}, onChooseFolder = null, {}, {}, {}) } }
+
+        onNodeWithText("Change folder").assertDoesNotExist()
+        onNodeWithText("Files are saved in Download/Jaitsizazu.").assertExists()
+    }
+
+    @Test
+    fun theAndroidEngineProblemsAreInBasque() = runComposeUiTest {
+        useAppLanguage(AppLanguage.BASQUE)
+        val notReady = Problem.ToolNotReadyInApp(Tool.FFMPEG, "/data/app/lib/libffmpeg.so", "failed to initialize")
+        val state = failed.copy(
+            setupWarnings = listOf(notReady),
+            update = UpdateStatus.Failed(Problem.UpdateNotDownloaded("Unable to resolve host")),
+        )
+        setContent { MaterialTheme { DownloaderScreen(state, {}, {}, null, {}, {}, {}) } }
+
+        onNodeWithText(
+            "ffmpeg ez dago prest Jaitsizazuren barruan (/data/app/lib/libffmpeg.so).",
+            substring = true,
+        ).assertExists()
+        onNodeWithText("failed to initialize", substring = true).assertExists()
+        onNodeWithText(
+            "Ezin izan da yt-dlp berria deskargatu. Egiaztatu Interneteko konexioa eta saiatu berriro.\nUnable to resolve host",
+        ).assertExists()
     }
 
     @Test

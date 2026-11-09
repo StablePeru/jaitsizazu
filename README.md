@@ -2,7 +2,7 @@
 
 Jaitsizazu will download audio and video from YouTube and similar sites, and convert your own audio and video files. One minimal app for desktop (Windows and Linux) and Android, with no ads, no telemetry and no accounts. For example, it will turn a WhatsApp voice note (Ogg Opus) into a WAV file you can drop into Ableton Live. It is part of DanonAA.
 
-> **Status:** the desktop app converts files and downloads from web addresses, in Basque. Conversions are tested against real ffmpeg, and downloads against real yt-dlp with a local test server, inside Docker. The downloader has not been tried against YouTube from the app yet. Android and installers are not done yet.
+> **Status:** the desktop app converts files and downloads from web addresses, in Basque. Conversions are tested against real ffmpeg, and downloads against real yt-dlp with a local test server, inside Docker. The downloader has not been tried against YouTube from the app yet. The Android app builds (a debug APK) and has both tabs, but it has not been tried on a phone yet. Installers are not done yet.
 
 ## Language
 
@@ -41,9 +41,22 @@ Only single videos are downloaded, never whole playlists. Nothing is ever overwr
 
 Sites such as YouTube change often, and an old yt-dlp stops working with them. **Update yt-dlp** (*Eguneratu yt-dlp*) replaces the yt-dlp that the app uses with the latest stable release, in place. If that yt-dlp is read-only for you (for example, installed system-wide), the app says so and changes nothing: update it the way you installed it.
 
+## Android
+
+The Android app (Android 8 or later) has the same two tabs. The differences:
+
+- **Convert:** **Choose file** opens Android's file picker. The app copies the file into its private cache, converts it there and saves the result in `Download/Jaitsizazu`.
+- **Download:** there is no folder to choose. Every file goes to `Download/Jaitsizazu`, and the screen says so.
+- Nothing is ever overwritten: a name that is taken gets a variant, such as `memo (1).wav`.
+- The app needs no storage permission on Android 10 and later. On Android 8 and 9 it asks for the storage permission the first time it saves, because those versions need it to write into `Download`.
+- yt-dlp, Python, ffmpeg and the QuickJS JavaScript runtime (for YouTube) come inside the app, from [youtubedl-android](https://github.com/yausername/youtubedl-android). The first start takes a few seconds to unpack them. Nothing else needs installing.
+- The yt-dlp inside the app is as old as the app. **Update yt-dlp** downloads the latest stable release from GitHub into the app, without a new version of the app. Do it once after installing.
+- **Limitation:** a download keeps running only while the app is open. If you leave the app, Android may stop it.
+
 ## External tools
 
-The app runs these programs. It does not install them: only **Update yt-dlp** downloads something, a newer yt-dlp, and only when you click it.
+On desktop the app runs these programs.
+It does not install them: only **Update yt-dlp** downloads something, a newer yt-dlp, and only when you click it.
 
 | Tool | Needed for | Variable |
 |------|------------|----------|
@@ -95,10 +108,13 @@ This is not legal advice. You are responsible for how you use the app.
 Everything builds and tests inside Docker. You only need Docker with Compose.
 
 ```sh
-docker compose build build                        # build image (JDK 21, ffmpeg and yt-dlp)
+docker compose build build                        # build image (JDK 21, ffmpeg, yt-dlp and the Android SDK)
 docker compose run --rm build ./gradlew check     # compile and run the tests
 docker compose run --rm build ./gradlew build     # full build
+docker compose run --rm build ./gradlew :androidApp:assembleDebug   # Android debug APK
 ```
+
+The debug APK is `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. It holds Python, ffmpeg and QuickJS for 64 and 32-bit ARM phones and for the x86_64 emulator, so it is large. Install it with `adb install`. The Android tests run on the build machine's JVM, with no phone or emulator.
 
 Gradle downloads are cached in the `gradle-home` Docker volume. The tests in `engine-desktop` run the image's ffmpeg and yt-dlp for real. The yt-dlp tests download from an HTTP server that the test itself starts on `127.0.0.1`: no test reaches the internet. That server has no separate video and audio streams, so merging them (the 4K choice on YouTube) is checked only through the yt-dlp arguments. The Dockerfile pins the yt-dlp version and checks its SHA-256.
 
@@ -136,16 +152,16 @@ The script pins the Temurin, FFmpeg, yt-dlp and Deno versions at its top, downlo
 
 ## Architecture
 
-Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` and `DownloadMedia` use cases and three ports, `MediaConverter`, `MediaDownloader` and `DownloaderUpdater`. Failures are typed `Problem` values, not sentences: the UI puts them into words in the app's language and quotes the output of ffmpeg and yt-dlp as it is. Each platform plugs in an engine adapter: on desktop it runs ffmpeg and yt-dlp (with Deno) as subprocesses; on Android it will use youtubedl-android. The shared Compose UI only talks to the use cases.
+Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` and `DownloadMedia` use cases and three ports, `MediaConverter`, `MediaDownloader` and `DownloaderUpdater`. Failures are typed `Problem` values, not sentences: the UI puts them into words in the app's language and quotes the output of ffmpeg and yt-dlp as it is. Each platform plugs in an engine adapter: on desktop it runs ffmpeg and yt-dlp (with Deno) as subprocesses; on Android it runs the same subprocess adapters on the Python, yt-dlp, ffmpeg and QuickJS that youtubedl-android ships, and publishes finished files to `Download/Jaitsizazu`. The shared Compose UI only talks to the use cases.
 
 | Module | Content |
 |--------|---------|
 | `core` | Kotlin Multiplatform domain code, no I/O and no UI. |
-| `ui` | Kotlin Multiplatform Compose UI: plain state holders, stateless screens and every user-facing text, as Compose resources (Basque in `values/`, English in `values-en/`). JVM target only for now. |
-| `engine-desktop` | Desktop engine adapters: finds and runs ffmpeg and yt-dlp, and reads yt-dlp's progress. |
+| `ui` | Kotlin Multiplatform Compose UI for the JVM and Android: plain state holders, stateless screens and every user-facing text, as Compose resources (Basque in `values/`, English in `values-en/`). |
+| `engine-desktop` | Engine adapters that run ffmpeg and yt-dlp as subprocesses and read yt-dlp's progress. Despite the name, Android uses them too. |
+| `engine-android` | Android engine: where youtubedl-android puts its programs, the yt-dlp updater, and publishing to `Download/Jaitsizazu`. |
 | `desktopApp` | Compose desktop app for Windows and Linux, with the Convert and Download tabs. It wires the engine into the UI and owns the file and folder dialogs. |
-
-Android will add its own engine module and app module. `core` and `ui` gain an Android target without moving code.
+| `androidApp` | Android app with the same tabs. It wires the Android engine into the UI and owns the file picker. |
 
 ## Credits
 
@@ -153,7 +169,8 @@ Jaitsizazu builds on:
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) for downloads;
 - [Deno](https://deno.com/) to run YouTube's JavaScript for yt-dlp;
-- [FFmpeg](https://ffmpeg.org/) for conversions.
+- [FFmpeg](https://ffmpeg.org/) for conversions;
+- [youtubedl-android](https://github.com/yausername/youtubedl-android) (GPL-3.0), which brings Python, yt-dlp, FFmpeg and QuickJS to Android.
 
 It studies these apps as references:
 

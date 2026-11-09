@@ -37,6 +37,7 @@
     <string name="quality_video_best_hint">Very large files. MP4 when possible, otherwise MKV. VP9 and AV1 videos may need a modern player.</string>
     <string name="change_folder">Change folder</string>
     <string name="no_folder_chosen">No folder chosen yet.</string>
+    <string name="fixed_folder">Files are saved in %1$s.</string>
     <string name="download_button">Download</string>
     <string name="cancelling">Cancelling…</string>
     <string name="download_cancelled">Download cancelled.</string>

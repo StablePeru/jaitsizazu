@@ -39,6 +39,7 @@
     <string name="quality_video_best_hint">Fitxategi oso handiak. MP4 ahal denean, bestela MKV. VP9 eta AV1 bideoek erreproduzigailu berri bat behar izan dezakete.</string>
     <string name="change_folder">Aldatu karpeta</string>
     <string name="no_folder_chosen">Oraindik ez duzu karpetarik aukeratu.</string>
+    <string name="fixed_folder">Fitxategiak hemen gordetzen dira: %1$s</string>
     <string name="download_button">Deskargatu</string>
     <string name="cancelling">Bertan behera uzten…</string>
     <string name="download_cancelled">Deskarga bertan behera utzi da.</string>

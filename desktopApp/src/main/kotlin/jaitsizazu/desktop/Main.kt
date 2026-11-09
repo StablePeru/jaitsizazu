@@ -1,19 +1,12 @@
 package jaitsizazu.desktop
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
-import androidx.compose.material.Tab
-import androidx.compose.material.TabRow
-import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import jaitsizazu.core.ConvertMedia
@@ -26,6 +19,7 @@ import jaitsizazu.engine.desktop.ToolLookup
 import jaitsizazu.engine.desktop.YtDlpDownloader
 import jaitsizazu.engine.desktop.YtDlpUpdater
 import jaitsizazu.ui.AppLanguage
+import jaitsizazu.ui.AppTabs
 import jaitsizazu.ui.ConverterScreen
 import jaitsizazu.ui.ConverterStateHolder
 import jaitsizazu.ui.DownloaderScreen
@@ -34,8 +28,6 @@ import jaitsizazu.ui.resources.Res
 import jaitsizazu.ui.resources.choose_file_title
 import jaitsizazu.ui.resources.choose_folder_approve
 import jaitsizazu.ui.resources.choose_folder_title
-import jaitsizazu.ui.resources.tab_convert
-import jaitsizazu.ui.resources.tab_download
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -135,19 +127,6 @@ fun main() {
                 }
             }
         }
-    }
-}
-
-/** The "Convert" and "Download" tabs. Both screens keep their state while hidden: the holders own it. */
-@Composable
-private fun AppTabs(convert: @Composable () -> Unit, download: @Composable () -> Unit) {
-    var selected by remember { mutableStateOf(0) }
-    Column {
-        TabRow(selectedTabIndex = selected) {
-            Tab(selected = selected == 0, onClick = { selected = 0 }, text = { Text(stringResource(Res.string.tab_convert)) })
-            Tab(selected = selected == 1, onClick = { selected = 1 }, text = { Text(stringResource(Res.string.tab_download)) })
-        }
-        if (selected == 0) convert() else download()
     }
 }
 

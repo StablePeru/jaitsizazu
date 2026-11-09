@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Downloads, and the yt-dlp update. Nothing else goes online: no ads, no telemetry, no accounts. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only Android 8 and 9 need it to save into Download/Jaitsizazu; the app asks before saving. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- The app name is the same in every language. Native libraries are extracted at install
+         (jniLibs.useLegacyPackaging in build.gradle.kts): youtubedl-android runs its binaries from there. -->
+    <application
+        android:allowBackup="false"
+        android:label="Jaitsizazu"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity
+            android:name="jaitsizazu.android.MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

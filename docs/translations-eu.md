@@ -36,6 +36,7 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 | `quality_video_best_hint` | Very large files. MP4 when possible, otherwise MKV. VP9 and AV1 videos may need a modern player. | Fitxategi oso handiak. MP4 ahal denean, bestela MKV. VP9 eta AV1 bideoek erreproduzigailu berri bat behar izan dezakete. |
 | `change_folder` | Change folder | Aldatu karpeta |
 | `no_folder_chosen` | No folder chosen yet. | Oraindik ez duzu karpetarik aukeratu. |
+| `fixed_folder` | Files are saved in %1$s. | Fitxategiak hemen gordetzen dira: %1$s |
 | `download_button` | Download | Deskargatu |
 | `cancelling` | Cancelling… | Bertan behera uzten… |
 | `download_cancelled` | Download cancelled. | Deskarga bertan behera utzi da. |
