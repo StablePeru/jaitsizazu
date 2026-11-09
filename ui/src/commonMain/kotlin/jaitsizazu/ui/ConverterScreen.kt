@@ -8,9 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Button
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,7 +34,8 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The converter screen. Stateless: it shows [state] and reports clicks
  * through the callbacks. The caller owns the state and the file chooser.
- * While a conversion runs, a Cancel button reports [onCancel].
+ * While a conversion runs, a Cancel button takes the Convert button's place
+ * and reports [onCancel].
  */
 @Composable
 fun ConverterScreen(
@@ -48,31 +48,40 @@ fun ConverterScreen(
 ) {
     val idle = state.status != ConversionStatus.Converting
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         Text(stringResource(Res.string.convert_title), style = MaterialTheme.typography.h5)
 
         SetupWarnings(state.setupWarnings)
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onChooseFile, enabled = idle) { Text(stringResource(Res.string.choose_file)) }
-            Text(
-                text = state.selectedFile?.let(::fileNameOf) ?: stringResource(Res.string.no_file_chosen),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val chosen = state.selectedFile?.let(::fileNameOf)
+                Text(
+                    text = chosen ?: stringResource(Res.string.no_file_chosen),
+                    color = if (chosen != null) Palette.Text else Palette.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                QuietButton(stringResource(Res.string.choose_file), onChooseFile, enabled = idle)
+            }
+            Divider(color = Palette.Line)
         }
 
-        Text(stringResource(Res.string.convert_to), style = MaterialTheme.typography.subtitle1)
-        ChoiceGroup(AudioFormat.entries, state.format, idle, { it.label }, onFormatSelected)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onConvert, enabled = state.canConvert) { Text(stringResource(Res.string.convert_button)) }
-            if (!idle) OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.cancel)) }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SectionLabel(stringResource(Res.string.convert_to))
+            ChoiceGroup(AudioFormat.entries, state.format, idle, { it.label }, onFormatSelected)
         }
 
         StatusLine(state.status)
+
+        if (idle) {
+            PrimaryButton(stringResource(Res.string.convert_button), onConvert, enabled = state.canConvert)
+        } else {
+            SecondaryButton(stringResource(Res.string.cancel), onCancel)
+        }
     }
 }
 
@@ -81,24 +90,22 @@ fun ConverterScreen(
 internal fun SetupWarnings(problems: List<Problem>) {
     if (problems.isEmpty()) return
     val text = problems.map { problemText(it) }.joinToString("\n\n")
-    SelectionContainer { Text(text, color = MaterialTheme.colors.error) }
+    SelectionContainer { Text(text, style = MaterialTheme.typography.body2, color = MaterialTheme.colors.error) }
 }
 
 @Composable
 private fun StatusLine(status: ConversionStatus) {
     when (status) {
         ConversionStatus.Idle -> Unit
-        ConversionStatus.Converting -> Text(stringResource(Res.string.converting))
-        is ConversionStatus.Done -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)))
-            SelectionContainer {
-                Text(status.outputPath, style = MaterialTheme.typography.body2)
-            }
+        ConversionStatus.Converting -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(Res.string.converting))
+            ThinProgress(progress = null)
         }
+        is ConversionStatus.Done -> DoneLine(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)), status.outputPath)
         is ConversionStatus.Failed -> SelectionContainer {
             Text(failureText(status.problem, status.leftover), color = MaterialTheme.colors.error)
         }
-        ConversionStatus.Cancelled -> Text(stringResource(Res.string.conversion_cancelled))
+        ConversionStatus.Cancelled -> Text(stringResource(Res.string.conversion_cancelled), color = Palette.Muted)
     }
 }
 

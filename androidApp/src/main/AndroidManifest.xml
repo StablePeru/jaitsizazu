@@ -14,7 +14,7 @@
         android:allowBackup="false"
         android:label="Jaitsizazu"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name="jaitsizazu.android.MainActivity"
             android:exported="true"

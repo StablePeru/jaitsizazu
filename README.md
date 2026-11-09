@@ -181,3 +181,5 @@ It studies these apps as references:
 ## License
 
 [GPL-3.0](LICENSE).
+
+The headings and tabs use the Space Grotesk font, bundled in `ui/src/commonMain/composeResources/font/` under the SIL Open Font License 1.1. Its license text ships inside the app: [`SpaceGrotesk-OFL.txt`](ui/src/commonMain/composeResources/files/licenses/SpaceGrotesk-OFL.txt).

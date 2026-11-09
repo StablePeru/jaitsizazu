@@ -4,17 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Button
-import androidx.compose.material.Divider
-import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,8 +44,8 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The downloader screen. Stateless: it shows [state] and reports user actions
  * through the callbacks. The caller owns the state and the folder chooser.
- * While a download runs, a Cancel button reports [onCancel]. The legal note
- * is always shown.
+ * While a download runs, a Cancel button takes the Download button's place
+ * and reports [onCancel]. The legal note is always shown.
  *
  * [onChooseFolder] null means the folder is fixed (on Android): there is no
  * button to change it, and the screen says where files go. While the engine
@@ -70,60 +64,69 @@ fun DownloaderScreen(
 ) {
     val idle = !state.isBusy
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         Text(stringResource(Res.string.download_title), style = MaterialTheme.typography.h5)
-        Text(stringResource(Res.string.legal_note), style = MaterialTheme.typography.body2)
 
         SetupWarnings(state.setupWarnings)
 
-        OutlinedTextField(
+        UnderlineField(
+            label = stringResource(Res.string.web_address),
             value = state.url,
             onValueChange = onUrlChange,
-            label = { Text(stringResource(Res.string.web_address)) },
-            placeholder = { Text("https://") },
-            singleLine = true,
             enabled = idle,
-            modifier = Modifier.fillMaxWidth(),
+            placeholder = "https://",
         )
 
-        Text(stringResource(Res.string.save_as), style = MaterialTheme.typography.subtitle1)
-        ChoiceGroup(
-            options = DownloadQuality.entries,
-            selected = state.quality,
-            enabled = idle,
-            label = { qualityLabel(it) },
-            onSelected = onQualitySelected,
-            hint = { qualityHint(it) },
-        )
-
-        if (onChooseFolder != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onChooseFolder, enabled = idle) { Text(stringResource(Res.string.change_folder)) }
-                Text(
-                    text = state.outputDirectory.ifBlank { stringResource(Res.string.no_folder_chosen) },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        } else {
-            Text(stringResource(Res.string.fixed_folder, state.outputDirectory))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SectionLabel(stringResource(Res.string.save_as))
+            ChoiceGroup(
+                options = DownloadQuality.entries,
+                selected = state.quality,
+                enabled = idle,
+                label = { qualityLabel(it) },
+                onSelected = onQualitySelected,
+                hint = { qualityHint(it) },
+            )
         }
 
-        if (state.preparing) Text(stringResource(Res.string.preparing_engine))
+        if (onChooseFolder != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = state.outputDirectory.ifBlank { stringResource(Res.string.no_folder_chosen) },
+                    style = MaterialTheme.typography.body2,
+                    color = Palette.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                QuietButton(stringResource(Res.string.change_folder), onChooseFolder, enabled = idle)
+            }
+        } else {
+            Text(stringResource(Res.string.fixed_folder, state.outputDirectory), style = MaterialTheme.typography.body2, color = Palette.Muted)
+        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(Res.string.download_button)) }
-            if (state.status is DownloadStatus.Downloading) {
-                OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.cancel)) }
+        if (state.preparing) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(Res.string.preparing_engine), style = MaterialTheme.typography.body2, color = Palette.Muted)
+                ThinProgress(progress = null)
             }
         }
 
         DownloadStatusBlock(state.status)
 
-        Divider()
-        UpdateBlock(state.update, enabled = state.canUpdate, onUpdate = onUpdate)
+        if (state.status is DownloadStatus.Downloading) {
+            SecondaryButton(stringResource(Res.string.cancel), onCancel)
+        } else {
+            PrimaryButton(stringResource(Res.string.download_button), onDownload, enabled = state.canDownload)
+        }
+
+        Hairline()
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(Res.string.legal_note), style = MaterialTheme.typography.caption, color = Palette.Muted)
+            UpdateBlock(state.update, enabled = state.canUpdate, onUpdate = onUpdate)
+        }
     }
 }
 
@@ -131,28 +134,21 @@ fun DownloaderScreen(
 private fun DownloadStatusBlock(status: DownloadStatus) {
     when (status) {
         DownloadStatus.Idle -> Unit
-        is DownloadStatus.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        is DownloadStatus.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val percent = (status.progress as? DownloadProgress.Downloading)?.percent
-            if (percent != null) {
-                LinearProgressIndicator(progress = (percent / 100).toFloat(), modifier = Modifier.fillMaxWidth())
-            } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
             Text(progressText(status.progress, progressWords()))
+            ThinProgress(percent?.let { (it / 100).toFloat() })
         }
-        is DownloadStatus.Done -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)))
-            SelectionContainer { Text(status.outputPath, style = MaterialTheme.typography.body2) }
-        }
+        is DownloadStatus.Done -> DoneLine(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)), status.outputPath)
         is DownloadStatus.Failed -> SelectionContainer {
             Text(failureText(status.problem, status.leftover), color = MaterialTheme.colors.error)
         }
-        DownloadStatus.Cancelling -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        DownloadStatus.Cancelling -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(Res.string.cancelling))
+            ThinProgress(progress = null)
         }
         is DownloadStatus.Cancelled -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.download_cancelled))
+            Text(stringResource(Res.string.download_cancelled), color = Palette.Muted)
             status.leftoverFolder?.let { folder ->
                 SelectionContainer {
                     Text(leftoverText(Leftover.TemporaryFolder(folder, detail = null)), color = MaterialTheme.colors.error)
@@ -164,19 +160,20 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
 
 @Composable
 private fun UpdateBlock(update: UpdateStatus, enabled: Boolean, onUpdate: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(Res.string.update_explainer), style = MaterialTheme.typography.body2)
-        OutlinedButton(onClick = onUpdate, enabled = enabled) { Text(stringResource(Res.string.update_button)) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(Res.string.update_explainer), style = MaterialTheme.typography.caption, color = Palette.Muted)
+        QuietButton(stringResource(Res.string.update_button), onUpdate, enabled = enabled)
+        val note = MaterialTheme.typography.body2
         when (update) {
             UpdateStatus.Idle -> Unit
-            UpdateStatus.Updating -> Text(stringResource(Res.string.updating))
-            is UpdateStatus.Done -> SelectionContainer { Text(stringResource(Res.string.update_done, update.toolReport)) }
+            UpdateStatus.Updating -> Text(stringResource(Res.string.updating), style = note)
+            is UpdateStatus.Done -> SelectionContainer { Text(stringResource(Res.string.update_done, update.toolReport), style = note) }
             is UpdateStatus.Unclear -> SelectionContainer {
                 val lastLine = update.lastLine?.let { stringResource(Res.string.update_unclear_last_line, it) }
-                Text(listOfNotNull(stringResource(Res.string.update_unclear), lastLine).joinToString("\n"))
+                Text(listOfNotNull(stringResource(Res.string.update_unclear), lastLine).joinToString("\n"), style = note)
             }
             is UpdateStatus.Failed -> SelectionContainer {
-                Text(problemText(update.problem), color = MaterialTheme.colors.error)
+                Text(problemText(update.problem), style = note, color = MaterialTheme.colors.error)
             }
         }
     }

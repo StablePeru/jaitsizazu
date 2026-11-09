@@ -1,6 +1,5 @@
 package jaitsizazu.desktop
 
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,6 +23,7 @@ import jaitsizazu.ui.ConverterScreen
 import jaitsizazu.ui.ConverterStateHolder
 import jaitsizazu.ui.DownloaderScreen
 import jaitsizazu.ui.DownloaderStateHolder
+import jaitsizazu.ui.JaitsizazuTheme
 import jaitsizazu.ui.resources.Res
 import jaitsizazu.ui.resources.choose_file_title
 import jaitsizazu.ui.resources.choose_folder_approve
@@ -93,7 +93,7 @@ fun main() {
         }
 
         Window(onCloseRequest = ::exitApplication, title = APP_NAME) {
-            MaterialTheme {
+            JaitsizazuTheme {
                 Surface {
                     AppTabs(
                         convert = {
