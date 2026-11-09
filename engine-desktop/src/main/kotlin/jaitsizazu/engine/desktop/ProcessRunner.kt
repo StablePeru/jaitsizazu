@@ -8,7 +8,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
-import java.io.OutputStream
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -39,7 +39,12 @@ interface ProcessRunner {
  * then waits once, up to [exitTimeout], for the process to exit before the
  * cancellation goes on. On Windows a running process keeps its output file
  * locked, so the caller can only remove that file once the process is gone.
- * [startProcess] starts the process; tests replace it.
+ * [startProcess] starts the process; tests replace it, and the Android app
+ * sets the environment there.
+ *
+ * Android runs this class too, so it only uses APIs that Android 8 (API level
+ * 26) has. Android has no `Process.descendants()`: there, the call fails, the
+ * failure is ignored, and only the process itself is killed.
  */
 class SystemProcessRunner(
     private val maxStderrLines: Int = 20,
@@ -85,11 +90,19 @@ class SystemProcessRunner(
 
     private fun readStdout(process: Process, onOutputLine: ((String) -> Unit)?) {
         if (onOutputLine == null) {
-            process.inputStream.use { it.copyTo(OutputStream.nullOutputStream()) }
+            process.inputStream.use(::drain)
         } else {
             process.inputStream.bufferedReader().useLines { lines ->
                 lines.forEach(onOutputLine)
             }
+        }
+    }
+
+    /** Reads [input] to its end and throws the bytes away. */
+    private fun drain(input: InputStream) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (input.read(buffer) >= 0) {
+            // Nothing to keep.
         }
     }
 
@@ -99,7 +112,9 @@ class SystemProcessRunner(
      * running would also keep the pipes open, and the readers would never end.
      */
     private fun killTree(process: Process) {
-        // A test double that is not an OS process cannot list its children.
+        // A test double that is not an OS process cannot list its children, and
+        // Android has no descendants() at all: runCatching also catches that
+        // NoSuchMethodError, so the process itself is still killed.
         runCatching { process.descendants().forEach { it.destroyForcibly() } }
         process.destroyForcibly()
     }

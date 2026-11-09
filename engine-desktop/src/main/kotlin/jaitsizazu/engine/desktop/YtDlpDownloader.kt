@@ -16,6 +16,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.text.Normalizer
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.ExperimentalPathApi
@@ -28,9 +29,14 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Desktop adapter for [MediaDownloader]: runs yt-dlp as a subprocess.
  *
- * yt-dlp, ffmpeg (to convert and merge) and deno (the JavaScript runtime that
- * YouTube needs) are looked for on every download, like ffmpeg for the
- * converter. Without deno the download still runs: other sites work without it.
+ * yt-dlp, ffmpeg (to convert and merge) and the JavaScript runtime that YouTube
+ * needs are looked for on every download, like ffmpeg for the converter.
+ * [locateJsRuntime] finds the runtime that yt-dlp calls [jsRuntimeName]: deno
+ * on desktop, QuickJS on Android. Without it the download still runs: other
+ * sites work without it.
+ *
+ * Paths are made with [Paths.get], not `Path.of`, which Android only has
+ * from API level 34: the Android app runs this class too.
  *
  * Each download gets its own work folder inside the output folder, made by
  * [createWorkDirectory]. yt-dlp writes every partial file there and moves only
@@ -56,13 +62,14 @@ import kotlin.time.Duration.Companion.milliseconds
 class YtDlpDownloader(
     private val locateYtDlp: () -> ToolLookup,
     private val locateFfmpeg: () -> ToolLookup,
-    private val locateDeno: () -> ToolLookup,
+    private val locateJsRuntime: () -> ToolLookup,
     private val runner: ProcessRunner,
     private val createWorkDirectory: (Path) -> Path = { Files.createTempDirectory(it, WORK_DIRECTORY_PREFIX) },
     private val isSameFile: (Path, Path) -> Boolean = ::isSameExistingFile,
     private val deleteRecursively: (Path) -> Unit = { it.deleteRecursively() },
     private val cleanupAttempts: Int = 3,
     private val cleanupRetryDelay: Duration = 500.milliseconds,
+    private val jsRuntimeName: String = JsRuntime.DENO,
 ) : MediaDownloader {
 
     override suspend fun download(request: DownloadRequest, onProgress: (DownloadProgress) -> Unit): MediaResult {
@@ -74,13 +81,13 @@ class YtDlpDownloader(
             is ToolLookup.Found -> lookup.path
             is ToolLookup.NotFound -> return MediaResult.Failure(lookup.problem)
         }
-        val deno = (locateDeno() as? ToolLookup.Found)?.path
+        val jsRuntime = (locateJsRuntime() as? ToolLookup.Found)?.let { JsRuntime(jsRuntimeName, it.path) }
 
         val output: Path
         val entriesBefore: List<Path>
         val work: Path
         try {
-            output = Path.of(request.outputDirectory)
+            output = Paths.get(request.outputDirectory)
             entriesBefore = output.listDirectoryEntries()
             work = createWorkDirectory(output)
         } catch (e: IOException) {
@@ -91,7 +98,7 @@ class YtDlpDownloader(
 
         val saved = AtomicReference<String?>(null)
         val command = listOf(ytDlp) +
-            YtDlpArguments.download(request.url, request.quality, output.toString(), work.toString(), ffmpeg, deno)
+            YtDlpArguments.download(request.url, request.quality, output.toString(), work.toString(), ffmpeg, jsRuntime)
         val outcome = try {
             runner.run(command) { line ->
                 YtDlpOutput.progress(line)?.let(onProgress)
@@ -120,7 +127,7 @@ class YtDlpDownloader(
             return MediaResult.Failure(Problem.DownloadFailed(outcome.exitCode, errors))
         }
         if (saved == null) return MediaResult.Failure(Problem.NoFileReported)
-        val savedPath = Path.of(saved)
+        val savedPath = Paths.get(saved)
         val name = savedPath.name
         // Only names that could be the same file on some file system are checked: it
         // saves asking the file system about every file in a large Downloads folder.

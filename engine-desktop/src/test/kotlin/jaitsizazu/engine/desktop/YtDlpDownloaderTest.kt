@@ -68,11 +68,13 @@ class YtDlpDownloaderTest {
         // Case-sensitive, like Linux, whatever the host. The integration tests use the real check.
         isSameFile: (Path, Path) -> Boolean = { a, b -> a.toString() == b.toString() },
         deleteRecursively: (Path) -> Unit = { it.deleteRecursively() },
+        jsRuntimeName: String = JsRuntime.DENO,
     ) = YtDlpDownloader(
         { ytDlp }, { ffmpeg }, { deno }, runner,
         createWorkDirectory = createWorkDirectory,
         isSameFile = isSameFile,
         deleteRecursively = deleteRecursively,
+        jsRuntimeName = jsRuntimeName,
     )
 
     /** Plays a case-insensitive file system, such as NTFS on Windows or APFS on macOS, on any host. */
@@ -119,9 +121,21 @@ class YtDlpDownloaderTest {
         assertEquals(out, work.parent)
         assertEquals(
             listOf("/opt/yt-dlp") +
-                YtDlpArguments.download(request.url, request.quality, out.toString(), work.toString(), "/opt/ffmpeg", "/opt/deno"),
+                YtDlpArguments.download(
+                    request.url, request.quality, out.toString(), work.toString(), "/opt/ffmpeg",
+                    JsRuntime(JsRuntime.DENO, "/opt/deno"),
+                ),
             command,
         )
+    }
+
+    @Test
+    fun passesTheLocatedRuntimeUnderTheGivenName() = runTest {
+        downloader(savesTheClip, deno = ToolLookup.Found("/lib/libqjs.so"), jsRuntimeName = JsRuntime.QUICKJS)
+            .download(request, progress::add)
+
+        val command = savesTheClip.commands.single()
+        assertEquals("quickjs:/lib/libqjs.so", command[command.indexOf("--js-runtimes") + 1])
     }
 
     @Test

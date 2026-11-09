@@ -8,8 +8,8 @@ import kotlin.test.assertTrue
 
 class YtDlpArgumentsTest {
 
-    private fun build(quality: DownloadQuality, url: String = "https://example.org/clip", deno: String? = null) =
-        YtDlpArguments.download(url, quality, "/home/me/Downloads", "/home/me/Downloads/.jaitsizazu-1", "/opt/ffmpeg", deno)
+    private fun build(quality: DownloadQuality, url: String = "https://example.org/clip", jsRuntime: JsRuntime? = null) =
+        YtDlpArguments.download(url, quality, "/home/me/Downloads", "/home/me/Downloads/.jaitsizazu-1", "/opt/ffmpeg", jsRuntime)
 
     /** The value right after [option], or null when [option] is missing. */
     private fun List<String>.valueOf(option: String): String? =
@@ -47,7 +47,44 @@ class YtDlpArgumentsTest {
     fun usesTheLocatedFfmpegAndDenoWhenThereIsOne() {
         assertEquals("/opt/ffmpeg", build(DownloadQuality.AUDIO_MP3).valueOf("--ffmpeg-location"))
         assertEquals(null, build(DownloadQuality.AUDIO_MP3).valueOf("--js-runtimes"))
-        assertEquals("deno:/opt/deno", build(DownloadQuality.AUDIO_MP3, deno = "/opt/deno").valueOf("--js-runtimes"))
+        assertEquals(
+            "deno:/opt/deno",
+            build(DownloadQuality.AUDIO_MP3, jsRuntime = JsRuntime(JsRuntime.DENO, "/opt/deno")).valueOf("--js-runtimes"),
+        )
+    }
+
+    @Test
+    fun namesQuickJsForYtDlpOnAndroid() {
+        val args = build(DownloadQuality.AUDIO_MP3, jsRuntime = JsRuntime(JsRuntime.QUICKJS, "/data/app/lib/libqjs.so"))
+
+        assertEquals(listOf("quickjs:/data/app/lib/libqjs.so"), args.valuesOf("--js-runtimes"))
+        assertTrue("--no-remote-components" in args, "$args")
+    }
+
+    /** The whole desktop command, as it was before the JavaScript runtime could be anything but deno. */
+    @Test
+    fun keepsTheDesktopArgumentsExactly() {
+        val args = build(DownloadQuality.AUDIO_MP3, jsRuntime = JsRuntime(JsRuntime.DENO, "/opt/deno"))
+
+        assertEquals(
+            listOf(
+                "--ignore-config", "--no-plugin-dirs", "--no-remote-components",
+                "--no-playlist", "--no-overwrites", "--encoding", "utf-8",
+                "--ffmpeg-location", "/opt/ffmpeg",
+                "--js-runtimes", "deno:/opt/deno",
+                "-P", "home:/home/me/Downloads", "-P", "temp:/home/me/Downloads/.jaitsizazu-1",
+                "-o", "%(title).150B [%(id)s].%(ext)s",
+                "--newline", "--progress", "--no-simulate",
+                "--progress-template",
+                "download:jaitsizazu-progress %(progress.downloaded_bytes)s %(progress.total_bytes)s " +
+                    "%(progress.total_bytes_estimate)s %(progress.speed)s %(progress.eta)s",
+                "--progress-template", "postprocess:jaitsizazu-processing %(progress.status)s %(progress.postprocessor)s",
+                "--print", "after_move:jaitsizazu-saved %(filepath)s",
+                "-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "2",
+                "--", "https://example.org/clip",
+            ),
+            args,
+        )
     }
 
     @Test

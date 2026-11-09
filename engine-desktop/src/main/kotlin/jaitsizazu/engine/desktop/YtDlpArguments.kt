@@ -2,6 +2,20 @@ package jaitsizazu.engine.desktop
 
 import jaitsizazu.core.DownloadQuality
 
+/**
+ * A JavaScript runtime for yt-dlp: [name] is yt-dlp's name for it
+ * (`--js-runtimes <name>:<path>`), [path] its binary. YouTube downloads need one.
+ */
+data class JsRuntime(val name: String, val path: String) {
+    companion object {
+        /** Deno, the runtime the desktop app uses. */
+        const val DENO = "deno"
+
+        /** QuickJS, the runtime that youtubedl-android bundles on Android. */
+        const val QUICKJS = "quickjs"
+    }
+}
+
 /** Builds yt-dlp command-line arguments, without the binary itself. Pure: it runs nothing. */
 object YtDlpArguments {
 
@@ -25,8 +39,8 @@ object YtDlpArguments {
      *
      * yt-dlp prints the lines that [YtDlpOutput] reads: the progress, and the
      * path of the saved file once it is in [outputDirectory].
-     * [deno] is the JavaScript runtime that YouTube downloads need, or null to
-     * leave yt-dlp's default (deno on the PATH).
+     * [jsRuntime] is the JavaScript runtime that YouTube downloads need, or null
+     * to leave yt-dlp's default (deno on the PATH).
      */
     fun download(
         url: String,
@@ -34,12 +48,12 @@ object YtDlpArguments {
         outputDirectory: String,
         workDirectory: String,
         ffmpeg: String,
-        deno: String?,
+        jsRuntime: JsRuntime?,
     ): List<String> =
         listOf("--ignore-config", "--no-plugin-dirs", "--no-remote-components") +
             listOf("--no-playlist", "--no-overwrites", "--encoding", "utf-8") +
             listOf("--ffmpeg-location", ffmpeg) +
-            (if (deno != null) listOf("--js-runtimes", "deno:$deno") else emptyList()) +
+            (if (jsRuntime != null) listOf("--js-runtimes", "${jsRuntime.name}:${jsRuntime.path}") else emptyList()) +
             listOf("-P", "home:$outputDirectory", "-P", "temp:$workDirectory", "-o", OUTPUT_TEMPLATE) +
             listOf("--newline", "--progress", "--no-simulate") +
             listOf("--progress-template", "download:${YtDlpOutput.PROGRESS} $DOWNLOAD_FIELDS") +

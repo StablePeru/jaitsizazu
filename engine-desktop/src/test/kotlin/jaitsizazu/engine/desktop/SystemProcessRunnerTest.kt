@@ -14,6 +14,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.stream.Stream
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,9 +30,13 @@ class SystemProcessRunnerTest {
     /**
      * A process that needs [dieAfterMillis] to exit once it is killed, like a
      * Windows process that still holds its files open for a moment. Its pipes
-     * close as soon as it is killed.
+     * close as soon as it is killed. When [childrenUnlisted] is set, listing its
+     * children throws it.
      */
-    private class SlowToDieProcess(private val dieAfterMillis: Long) : Process() {
+    private class SlowToDieProcess(
+        private val dieAfterMillis: Long,
+        private val childrenUnlisted: Throwable? = null,
+    ) : Process() {
         private val killed = CountDownLatch(1)
         private val exited = CountDownLatch(1)
 
@@ -49,6 +54,8 @@ class SystemProcessRunnerTest {
         override fun getOutputStream(): OutputStream = OutputStream.nullOutputStream()
         override fun getInputStream(): InputStream = pipe
         override fun getErrorStream(): InputStream = pipe
+
+        override fun descendants(): Stream<ProcessHandle> = childrenUnlisted?.let { throw it } ?: super.descendants()
 
         override fun waitFor(): Int {
             waiting = true
@@ -133,6 +140,16 @@ class SystemProcessRunnerTest {
         cancelWhileWaiting(process, SystemProcessRunner(startProcess = { process }))
 
         assertFalse(process.isAlive, "the cancellation went on while the killed process was still running")
+    }
+
+    @Test
+    fun killsTheProcessItselfWhenItsChildrenCannotBeListed() = runBlocking {
+        // Android has no Process.descendants(): there, calling it throws NoSuchMethodError.
+        val process = SlowToDieProcess(dieAfterMillis = 0, childrenUnlisted = NoSuchMethodError("descendants"))
+
+        cancelWhileWaiting(process, SystemProcessRunner(startProcess = { process }))
+
+        assertFalse(process.isAlive, "the process was not killed")
     }
 
     @Test
