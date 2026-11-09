@@ -14,6 +14,7 @@ import jaitsizazu.engine.android.AndroidYtDlpUpdater
 import jaitsizazu.engine.android.DownloadsPublisher
 import jaitsizazu.engine.android.JobFolders
 import jaitsizazu.engine.android.PUBLIC_FOLDER
+import jaitsizazu.engine.android.PickedFolders
 import jaitsizazu.engine.android.PublishingConverter
 import jaitsizazu.engine.android.PublishingDownloader
 import jaitsizazu.engine.android.YoutubeDlAndroidSetup
@@ -24,6 +25,7 @@ import jaitsizazu.engine.desktop.SystemProcessRunner
 import jaitsizazu.engine.desktop.YtDlpDownloader
 import jaitsizazu.ui.ConverterStateHolder
 import jaitsizazu.ui.DownloaderStateHolder
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,8 +93,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         preparing = true,
     )
 
-    /** The folder of the file picked last for conversion, removed when another is picked. */
-    private var pickedFolder: Path? = null
+    /** The folder of the file selected for conversion. Used on the main thread only. */
+    private val pickedFolders = PickedFolders()
 
     /** What went wrong while preparing the engine, shown next to a failed pick too. */
     private var engineWarnings: List<Problem> = emptyList()
@@ -125,9 +127,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun pickFileToConvert(uri: Uri) {
         viewModelScope.launch {
             val copied = withContext(Dispatchers.IO) { runCatching { copyIn(uri) } }
+            // Back on the main thread: picks are handled one at a time.
             copied.onSuccess { path ->
                 converter.showSetupWarnings(converterWarnings())
+                // Ignored while a conversion runs: then the new copy goes, and the running one keeps its file.
                 converter.selectFile(path.toString())
+                val selected = converter.state.value.selectedFile == path.toString()
+                pickedFolders.picked(path.parent, selected)?.let(::removeWhenUnused)
             }.onFailure { e ->
                 val problem = Problem.CannotCreateFile(uri.lastPathSegment ?: uri.toString(), e.message)
                 converter.showSetupWarnings(converterWarnings() + problem)
@@ -151,8 +157,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching { folder.deleteRecursively() }
             throw e
         }
-        pickedFolder?.let { old -> runCatching { old.deleteRecursively() } }
-        pickedFolder = folder
         return target
+    }
+
+    /**
+     * Removes [folder] once the conversion started last has ended: a cancelled
+     * one may still be stopping, with its input and output in that folder.
+     */
+    private fun removeWhenUnused(folder: Path) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            converter.awaitConversionEnd()
+            withContext(Dispatchers.IO) { runCatching { folder.deleteRecursively() } }
+        }
     }
 }

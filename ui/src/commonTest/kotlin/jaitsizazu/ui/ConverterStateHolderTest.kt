@@ -9,6 +9,11 @@ import jaitsizazu.core.MediaResult
 import jaitsizazu.core.Problem
 import jaitsizazu.core.Tool
 import kotlinx.coroutines.CompletableDeferred
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -25,7 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle
+@OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle, advanceTimeBy, runCurrent
 class ConverterStateHolderTest {
 
     private val noFfmpeg = Problem.ToolNotFound(Tool.FFMPEG, "JAITSIZAZU_FFMPEG", "bin/ffmpeg")
@@ -235,6 +240,44 @@ class ConverterStateHolderTest {
         assertTrue(converter.cancelled, "the converter was not cancelled")
         assertEquals(ConversionStatus.Cancelled, holder.state.value.status)
         assertTrue(holder.state.value.canConvert)
+    }
+
+    @Test
+    fun waitsUntilACancelledConversionHasFullyEnded() = runTest {
+        // Its engine still removes files in the folder of the input while it stops.
+        var stopped = false
+        val slowToStop = object : MediaConverter {
+            override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
+                try {
+                    awaitCancellation()
+                } finally {
+                    withContext(NonCancellable) { delay(5.seconds) }
+                    stopped = true
+                }
+            }
+        }
+        val holder = holder(slowToStop)
+        holder.selectFile(memo)
+        holder.convert()
+        runCurrent()
+        holder.cancel()
+        assertEquals(ConversionStatus.Cancelled, holder.state.value.status)
+
+        var ended = false
+        launch { holder.awaitConversionEnd(); ended = true }
+        advanceTimeBy(4.seconds)
+        assertFalse(ended, "it did not wait for the conversion to stop")
+        advanceUntilIdle()
+
+        assertTrue(stopped)
+        assertTrue(ended)
+    }
+
+    @Test
+    fun waitsForNothingWhenNoConversionRan() = runTest {
+        val holder = holder(FakeConverter())
+
+        holder.awaitConversionEnd()
     }
 
     @Test

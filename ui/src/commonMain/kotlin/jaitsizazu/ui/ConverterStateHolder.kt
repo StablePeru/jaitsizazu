@@ -34,6 +34,7 @@ class ConverterStateHolder(
     private val mutableState = MutableStateFlow(ConverterState())
     val state: StateFlow<ConverterState> = mutableState.asStateFlow()
 
+    /** The conversion started last. Kept after [cancel], for [awaitConversionEnd]. */
     private var conversion: Job? = null
 
     private val isConverting get() = mutableState.value.status == ConversionStatus.Converting
@@ -96,7 +97,15 @@ class ConverterStateHolder(
     fun cancel() {
         if (!isConverting) return
         conversion?.cancel()
-        conversion = null
         mutableState.update { it.copy(status = ConversionStatus.Cancelled) }
+    }
+
+    /**
+     * Suspends until the conversion started last, if any, has fully ended:
+     * after [cancel] its engine may still be stopping and removing files.
+     * Then nothing uses that conversion's files any more.
+     */
+    suspend fun awaitConversionEnd() {
+        conversion?.join()
     }
 }
