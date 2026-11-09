@@ -75,6 +75,18 @@ sealed interface Problem {
     /** yt-dlp could not update itself and ended with [exitCode]. */
     data class UpdateFailed(val exitCode: Int, val toolOutput: String) : Problem
 
+    /**
+     * The new yt-dlp could not be fetched or installed (on Android, where the
+     * app updates yt-dlp itself). [detail] is the system's own message, if any.
+     */
+    data class UpdateNotDownloaded(val detail: String?) : Problem
+
+    /**
+     * [tool] ships inside the app (on Android), but it is not ready at [path]:
+     * the app could not unpack or find it. [detail] is the system's own message, if any.
+     */
+    data class ToolNotReadyInApp(val tool: Tool, val path: String, val detail: String?) : Problem
+
     /** Something nobody expected went wrong. [detail] is the error's own message. */
     data class Unexpected(val detail: String) : Problem
 }
@@ -84,6 +96,9 @@ enum class Tool(val displayName: String) {
     FFMPEG("ffmpeg"),
     YT_DLP("yt-dlp"),
     DENO("deno"),
+
+    /** The JavaScript runtime that YouTube downloads need on Android, where deno is not used. */
+    QUICKJS("QuickJS"),
 }
 
 /** Temporary output that a failed operation could not remove, for the user to delete. */

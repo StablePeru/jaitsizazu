@@ -29,7 +29,9 @@ import jaitsizazu.ui.resources.problem_tool_not_at_configured_path
 import jaitsizazu.ui.resources.problem_tool_not_found
 import jaitsizazu.ui.resources.problem_tool_read_only
 import jaitsizazu.ui.resources.problem_unexpected
+import jaitsizazu.ui.resources.problem_tool_not_ready_in_app
 import jaitsizazu.ui.resources.problem_update_failed
+import jaitsizazu.ui.resources.problem_update_not_downloaded
 import jaitsizazu.ui.resources.quality_audio_mp3
 import jaitsizazu.ui.resources.quality_audio_original
 import jaitsizazu.ui.resources.quality_audio_original_hint
@@ -97,6 +99,11 @@ internal fun problemText(problem: Problem): String = when (problem) {
         }
     is Problem.UpdateFailed ->
         stringResource(Res.string.problem_update_failed, problem.exitCode).withRawLines(problem.toolOutput)
+    is Problem.UpdateNotDownloaded ->
+        stringResource(Res.string.problem_update_not_downloaded).withRawLines(problem.detail)
+    is Problem.ToolNotReadyInApp ->
+        stringResource(Res.string.problem_tool_not_ready_in_app, problem.tool.displayName, problem.path)
+            .withRawLines(problem.detail)
     is Problem.Unexpected -> stringResource(Res.string.problem_unexpected, problem.detail)
 }
 
@@ -112,7 +119,8 @@ internal fun leftoverText(leftover: Leftover): String = when (leftover) {
 private fun toolPurpose(tool: Tool): String = when (tool) {
     Tool.FFMPEG -> stringResource(Res.string.tool_purpose_ffmpeg)
     Tool.YT_DLP -> stringResource(Res.string.tool_purpose_yt_dlp)
-    Tool.DENO -> stringResource(Res.string.tool_purpose_deno)
+    // Both are the JavaScript runtime of YouTube downloads: deno on desktop, QuickJS on Android.
+    Tool.DENO, Tool.QUICKJS -> stringResource(Res.string.tool_purpose_deno)
 }
 
 /** The name of [quality] in the list of choices. */

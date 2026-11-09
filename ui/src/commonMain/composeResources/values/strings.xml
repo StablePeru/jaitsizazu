@@ -84,6 +84,8 @@
     <string name="problem_already_in_folder">Karpeta honetan badago jada: %1$s. Ez da ezer gainidatzi.</string>
     <string name="problem_already_in_folder_as">Karpeta honetan badago jada, %2$s izenarekin: %1$s. Ez da ezer gainidatzi.</string>
     <string name="problem_update_failed">yt-dlp ezin izan da eguneratu (irteera-kodea: %1$s).</string>
+    <string name="problem_update_not_downloaded">Ezin izan da yt-dlp berria deskargatu. Egiaztatu Interneteko konexioa eta saiatu berriro.</string>
+    <string name="problem_tool_not_ready_in_app">%1$s ez dago prest Jaitsizazuren barruan (%2$s). Itxi aplikazioa eta ireki berriro. Berriro gertatzen bada, instalatu berriro Jaitsizazu.</string>
     <string name="problem_unexpected">Ustekabeko errorea: %1$s</string>
     <string name="leftover_unfinished_file">Ezin izan da amaitu gabeko fitxategi hau ezabatu: %1$s</string>
     <string name="leftover_temporary_folder">Aldi baterako fitxategi batzuk ezin izan dira ezabatu: %1$s. Karpeta hori zuk ezaba dezakezu.</string>

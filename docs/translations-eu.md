@@ -7,7 +7,7 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 - Source files: `ui/src/commonMain/composeResources/values/strings.xml` (Basque) and `values-en/strings.xml` (English). This table is a copy for review: change the XML files, then this table.
 - `%1$s`, `%2$s` and so on are filled in by the app: a path, an address, a tool name, a number. In Basque, paths and names mostly go after a colon, so they never need a case ending.
 - Text from the external tools (the error output of ffmpeg and yt-dlp, and system messages) is never translated: the app shows it as it is, on the line after the translated sentence.
-- Technical names stay as they are: MP3, WAV, MP4, MKV, 4K, Opus, yt-dlp, ffmpeg, deno, PATH.
+- Technical names stay as they are: MP3, WAV, MP4, MKV, 4K, Opus, yt-dlp, ffmpeg, deno, QuickJS, PATH.
 - Not translated on purpose: the app name and window title (Jaitsizazu), and the format names in the converter (WAV, MP3, FLAC, Ogg Vorbis).
 
 | Key | English | Basque proposal |
@@ -75,6 +75,8 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 | `problem_already_in_folder` | %1$s is already in this folder. Nothing was overwritten. | Karpeta honetan badago jada: %1$s. Ez da ezer gainidatzi. |
 | `problem_already_in_folder_as` | %1$s is already in this folder, as %2$s. Nothing was overwritten. | Karpeta honetan badago jada, %2$s izenarekin: %1$s. Ez da ezer gainidatzi. |
 | `problem_update_failed` | yt-dlp could not update itself (exit code %1$s). | yt-dlp ezin izan da eguneratu (irteera-kodea: %1$s). |
+| `problem_update_not_downloaded` | The new yt-dlp could not be downloaded. Check the internet connection and try again. | Ezin izan da yt-dlp berria deskargatu. Egiaztatu Interneteko konexioa eta saiatu berriro. |
+| `problem_tool_not_ready_in_app` | %1$s is not ready inside Jaitsizazu (%2$s). Close the app and open it again. If it keeps happening, reinstall Jaitsizazu. | %1$s ez dago prest Jaitsizazuren barruan (%2$s). Itxi aplikazioa eta ireki berriro. Berriro gertatzen bada, instalatu berriro Jaitsizazu. |
 | `problem_unexpected` | Unexpected error: %1$s | Ustekabeko errorea: %1$s |
 | `leftover_unfinished_file` | The unfinished file %1$s could not be removed. | Ezin izan da amaitu gabeko fitxategi hau ezabatu: %1$s |
 | `leftover_temporary_folder` | Some temporary files could not be removed: %1$s. You can delete that folder. | Aldi baterako fitxategi batzuk ezin izan dira ezabatu: %1$s. Karpeta hori zuk ezaba dezakezu. |

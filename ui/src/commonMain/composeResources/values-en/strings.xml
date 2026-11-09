@@ -82,6 +82,8 @@
     <string name="problem_already_in_folder">%1$s is already in this folder. Nothing was overwritten.</string>
     <string name="problem_already_in_folder_as">%1$s is already in this folder, as %2$s. Nothing was overwritten.</string>
     <string name="problem_update_failed">yt-dlp could not update itself (exit code %1$s).</string>
+    <string name="problem_update_not_downloaded">The new yt-dlp could not be downloaded. Check the internet connection and try again.</string>
+    <string name="problem_tool_not_ready_in_app">%1$s is not ready inside Jaitsizazu (%2$s). Close the app and open it again. If it keeps happening, reinstall Jaitsizazu.</string>
     <string name="problem_unexpected">Unexpected error: %1$s</string>
     <string name="leftover_unfinished_file">The unfinished file %1$s could not be removed.</string>
     <string name="leftover_temporary_folder">Some temporary files could not be removed: %1$s. You can delete that folder.</string>
