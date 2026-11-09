@@ -48,4 +48,14 @@ class OutputFileNameTest {
     fun rejectsABlankName() {
         assertFailsWith<IllegalArgumentException> { outputFileName("  ", AudioFormat.WAV) }
     }
+
+    @Test
+    fun rejectsAPathWithSlashes() {
+        assertFailsWith<IllegalArgumentException> { outputFileName("v1.2/memo", AudioFormat.WAV) }
+    }
+
+    @Test
+    fun rejectsAPathWithBackslashes() {
+        assertFailsWith<IllegalArgumentException> { outputFileName("v1.2\\memo", AudioFormat.WAV) }
+    }
 }

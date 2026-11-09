@@ -1,7 +1,15 @@
 # Usage: docker compose run --rm build ./gradlew check
 services:
   build:
-    build: .
+    build:
+      context: .
+      args:
+        # The non-root user in the image. On Linux, match your own user so the
+        # bind-mounted checkout stays writable:
+        #   HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose build build
+        # (bash keeps UID read-only, hence the HOST_ prefix.)
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
     image: jaitsizazu-build:local
     working_dir: /workspace
     environment:

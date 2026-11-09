@@ -12,7 +12,11 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":ui"))
+    implementation(project(":engine-desktop"))
     implementation(compose.desktop.currentOs)
+
+    testImplementation(kotlin("test"))
 }
 
 compose.desktop {

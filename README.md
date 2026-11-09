@@ -2,7 +2,27 @@
 
 Jaitsizazu will download audio and video from YouTube and similar sites, and convert your own audio and video files. One minimal app for desktop (Windows and Linux) and Android, with no ads, no telemetry and no accounts. For example, it will turn a WhatsApp voice note (Ogg Opus) into a WAV file you can drop into Ableton Live. It is part of DanonAA.
 
-> **Status:** early skeleton. Nothing usable yet.
+> **Status:** the desktop converter is in place. Its conversions are tested against real ffmpeg inside Docker. Downloads, Android and installers are not done yet.
+
+## Convert a file (desktop)
+
+1. Click **Choose file** and pick an audio file, for example a WhatsApp voice note.
+2. Pick the format: WAV (the default), MP3, FLAC or Ogg Vorbis.
+3. Click **Convert**.
+
+The new file is saved next to the original. Nothing is ever overwritten: if `memo.wav` exists, you get `memo (1).wav`.
+
+### ffmpeg is required
+
+The app runs [FFmpeg](https://ffmpeg.org/) to convert. It looks for it in this order:
+
+| Order | Where |
+|-------|-------|
+| 1 | The path in the `JAITSIZAZU_FFMPEG` environment variable. |
+| 2 | `bin/ffmpeg` (`bin\ffmpeg.exe` on Windows) in the folder of the installed app launcher. |
+| 3 | `ffmpeg` on your `PATH`. |
+
+If none is found, the window says so and explains these options.
 
 ## Why
 
@@ -34,21 +54,33 @@ This is not legal advice. You are responsible for how you use the app.
 Everything builds and tests inside Docker. You only need Docker with Compose.
 
 ```sh
-docker compose build build                        # build image (JDK 21)
+docker compose build build                        # build image (JDK 21 and ffmpeg)
 docker compose run --rm build ./gradlew check     # compile and run the tests
 docker compose run --rm build ./gradlew build     # full build
 ```
 
-Gradle downloads are cached in the `gradle-home` Docker volume.
+Gradle downloads are cached in the `gradle-home` Docker volume. The tests in `engine-desktop` run the image's ffmpeg for real.
+
+**Linux: match your user.** The image runs as a user with UID and GID 1000. If your own user has other IDs, the bind-mounted checkout is not writable from the container. Build the image with yours:
+
+```sh
+HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose build build
+```
+
+The variables are called `HOST_UID` and `HOST_GID` because bash does not let you set `UID`. On Windows and macOS with Docker Desktop you can skip this.
 
 ## Architecture
 
-Hexagonal. The `core` module holds pure domain code: formats, requests and two ports, `MediaConverter` and `MediaDownloader`. Each platform plugs in an engine adapter: on desktop it will run the yt-dlp, ffmpeg and Deno binaries as subprocesses; on Android it will use youtubedl-android. The Compose Multiplatform UI only talks to the ports.
+Hexagonal. The `core` module holds pure domain code: formats, requests, the `ConvertMedia` use case and two ports, `MediaConverter` and `MediaDownloader`. Each platform plugs in an engine adapter: on desktop it runs ffmpeg as a subprocess today, and will run yt-dlp and Deno the same way; on Android it will use youtubedl-android. The shared Compose UI only talks to the use cases.
 
 | Module | Content |
 |--------|---------|
 | `core` | Kotlin Multiplatform domain code, no I/O and no UI. |
-| `desktopApp` | Compose desktop app for Windows and Linux. |
+| `ui` | Kotlin Multiplatform Compose UI: plain state holders and stateless screens. JVM target only for now. |
+| `engine-desktop` | Desktop engine adapter: finds and runs ffmpeg. |
+| `desktopApp` | Compose desktop app for Windows and Linux. It wires the engine into the UI and owns the file dialog. |
+
+Android will add its own engine module and app module. `core` and `ui` gain an Android target without moving code.
 
 ## Credits
 

@@ -17,4 +17,6 @@ dependencyResolutionManagement {
 }
 
 include(":core")
+include(":ui")
+include(":engine-desktop")
 include(":desktopApp")
