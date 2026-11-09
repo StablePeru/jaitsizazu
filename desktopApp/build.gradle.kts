@@ -28,6 +28,7 @@ dependencies {
     )
 
     testImplementation(kotlin("test"))
+    testImplementation(libs.compose.ui.test)
 }
 
 // The app JAR plus every runtime dependency JAR in one folder, ready for
@@ -39,6 +40,11 @@ tasks.register<Sync>("stageAppJars") {
     from(tasks.jar)
     from(configurations.runtimeClasspath)
     into(layout.buildDirectory.dir("app-jars/${desktopTarget ?: "current-os"}"))
+}
+
+// Every text lives in :ui, which owns the resources. This module has none.
+compose.resources {
+    generateResClass = never
 }
 
 compose.desktop {

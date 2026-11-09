@@ -170,6 +170,20 @@ class CrashReporterTest {
     }
 
     @Test
+    fun saysItInTheTextsItWasGiven() {
+        val log = dir.resolve("crash.log")
+        val texts = CrashTexts(intro = "Errorea:", detailsSaved = "Gordeta: $log", detailsNotSaved = "Ez da gorde: $log")
+        val reporter = CrashReporter(log, { dialogs += it }, texts, clock = { now }, isEventThread = { true }, runOnEventThread = { it() })
+
+        reporter.uncaughtException(thread, IllegalStateException("first"))
+
+        val message = dialogs.single()
+        assertTrue(message.startsWith("Errorea:\n"), message)
+        assertTrue("first" in message, message)
+        assertTrue(message.endsWith("Gordeta: $log"), message)
+    }
+
+    @Test
     fun showsTheDialogOfACrashElsewhereLaterOnTheEventThread() = FakeEventThread().use { events ->
         val shownOnEventThread = CopyOnWriteArrayList<Boolean>()
         val shown = CountDownLatch(1)

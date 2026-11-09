@@ -25,12 +25,21 @@ import jaitsizazu.engine.desktop.ToolLocator
 import jaitsizazu.engine.desktop.ToolLookup
 import jaitsizazu.engine.desktop.YtDlpDownloader
 import jaitsizazu.engine.desktop.YtDlpUpdater
+import jaitsizazu.ui.AppLanguage
 import jaitsizazu.ui.ConverterScreen
 import jaitsizazu.ui.ConverterStateHolder
 import jaitsizazu.ui.DownloaderScreen
 import jaitsizazu.ui.DownloaderStateHolder
+import jaitsizazu.ui.resources.Res
+import jaitsizazu.ui.resources.choose_file_title
+import jaitsizazu.ui.resources.choose_folder_approve
+import jaitsizazu.ui.resources.choose_folder_title
+import jaitsizazu.ui.resources.tab_convert
+import jaitsizazu.ui.resources.tab_download
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -52,13 +61,18 @@ private class Tools(appDirectory: Path?) {
 /**
  * Container: wires the desktop engine into the shared UI, in two tabs.
  *
- * The tools are looked for on every conversion and download. The checks at
- * startup only warn early, never block, and run off the UI thread like the
+ * Every text is in [AppLanguage.DEFAULT], Basque, whatever the language of the
+ * system. The tools are looked for on every conversion and download. The checks
+ * at startup only warn early, never block, and run off the UI thread like the
  * work itself. Uncaught exceptions go to `crash.log` in [logDirectory] and to
  * an error dialog.
  */
 fun main() {
-    Thread.setDefaultUncaughtExceptionHandler(CrashReporter(logDirectory().resolve("crash.log"), ::showErrorDialog))
+    useAppLanguage(AppLanguage.DEFAULT)
+    val crashLog = logDirectory().resolve("crash.log")
+    // Read once now, so the crash handler never reads resources. If even this fails, English.
+    val crashTexts = runCatching { runBlocking { loadCrashTexts(crashLog) } }.getOrElse { CrashTexts.fallback(crashLog) }
+    Thread.setDefaultUncaughtExceptionHandler(CrashReporter(crashLog, ::showErrorDialog, crashTexts))
     // Native-looking Swing dialogs (the folder chooser, the error dialog). Optional.
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
 
@@ -92,9 +106,10 @@ fun main() {
                     AppTabs(
                         convert = {
                             val state by converter.state.collectAsState()
+                            val title = stringResource(Res.string.choose_file_title)
                             ConverterScreen(
                                 state = state,
-                                onChooseFile = { chooseFile(window)?.let(converter::selectFile) },
+                                onChooseFile = { chooseFile(window, title)?.let(converter::selectFile) },
                                 onFormatSelected = converter::selectFormat,
                                 onConvert = converter::convert,
                                 onCancel = converter::cancel,
@@ -102,11 +117,15 @@ fun main() {
                         },
                         download = {
                             val state by downloader.state.collectAsState()
+                            val title = stringResource(Res.string.choose_folder_title)
+                            val approve = stringResource(Res.string.choose_folder_approve)
                             DownloaderScreen(
                                 state = state,
                                 onUrlChange = downloader::setUrl,
                                 onQualitySelected = downloader::selectQuality,
-                                onChooseFolder = { chooseFolder(state.outputDirectory)?.let(downloader::selectFolder) },
+                                onChooseFolder = {
+                                    chooseFolder(state.outputDirectory, title, approve)?.let(downloader::selectFolder)
+                                },
                                 onDownload = downloader::download,
                                 onCancel = downloader::cancel,
                                 onUpdate = downloader::updateDownloader,
@@ -125,8 +144,8 @@ private fun AppTabs(convert: @Composable () -> Unit, download: @Composable () ->
     var selected by remember { mutableStateOf(0) }
     Column {
         TabRow(selectedTabIndex = selected) {
-            Tab(selected = selected == 0, onClick = { selected = 0 }, text = { Text("Convert") })
-            Tab(selected = selected == 1, onClick = { selected = 1 }, text = { Text("Download") })
+            Tab(selected = selected == 0, onClick = { selected = 0 }, text = { Text(stringResource(Res.string.tab_convert)) })
+            Tab(selected = selected == 1, onClick = { selected = 1 }, text = { Text(stringResource(Res.string.tab_download)) })
         }
         if (selected == 0) convert() else download()
     }
@@ -145,23 +164,24 @@ private fun showErrorDialog(message: String) {
     JOptionPane.showMessageDialog(null, message, APP_NAME, JOptionPane.ERROR_MESSAGE)
 }
 
-/** Shows the native file dialog. Returns the chosen path, or null if cancelled. */
-private fun chooseFile(parent: Frame): String? {
-    val dialog = FileDialog(parent, "Choose an audio file", FileDialog.LOAD)
+/** Shows the native file dialog, titled [title]. Returns the chosen path, or null if cancelled. */
+private fun chooseFile(parent: Frame, title: String): String? {
+    val dialog = FileDialog(parent, title, FileDialog.LOAD)
     dialog.isVisible = true
     val name = dialog.file ?: return null
     return File(dialog.directory, name).path
 }
 
 /**
- * Shows a folder chooser that starts in [current]. Returns the chosen folder, or null if cancelled.
+ * Shows a folder chooser that starts in [current], titled [title], with [approve]
+ * on its button. Returns the chosen folder, or null if cancelled.
  * Swing's chooser, because the native AWT dialog cannot pick folders on Windows.
  */
-private fun chooseFolder(current: String): String? {
+private fun chooseFolder(current: String, title: String, approve: String): String? {
     val chooser = JFileChooser(current.takeIf { it.isNotBlank() }?.let(::File)).apply {
-        dialogTitle = "Choose where to save downloads"
+        dialogTitle = title
         fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
         isAcceptAllFileFilterUsed = false
     }
-    return if (chooser.showDialog(null, "Choose") == JFileChooser.APPROVE_OPTION) chooser.selectedFile?.path else null
+    return if (chooser.showDialog(null, approve) == JFileChooser.APPROVE_OPTION) chooser.selectedFile?.path else null
 }

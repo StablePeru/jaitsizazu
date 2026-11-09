@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Propuestas; las revisa el autor. -->
+<!--
+  Basque texts: the default language of the app, whatever the system language.
+  English is in values-en/strings.xml. Every key here must also be there, with
+  the same %N$s placeholders: StringResourcesTest checks it. Paths, addresses
+  and the output of ffmpeg and yt-dlp are shown as they are and never live here.
+  docs/translations-eu.md lists every key with its English and Basque text.
+-->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_convert">Bihurtu</string>
+    <string name="tab_download">Deskargatu</string>
+
+    <!-- Shared -->
+    <string name="cancel">Utzi</string>
+    <string name="saved_as">Gordeta: %1$s</string>
+
+    <!-- Convert screen -->
+    <string name="convert_title">Bihurtu audio-fitxategi bat</string>
+    <string name="choose_file">Aukeratu fitxategia</string>
+    <string name="no_file_chosen">Oraindik ez duzu fitxategirik aukeratu.</string>
+    <string name="convert_to">Formatu berria</string>
+    <string name="convert_button">Bihurtu</string>
+    <string name="converting">Bihurtzen…</string>
+    <string name="conversion_cancelled">Bihurketa bertan behera utzi da.</string>
+
+    <!-- Download screen -->
+    <string name="download_title">Deskargatu web-helbide batetik</string>
+    <string name="legal_note">Deskargatu zure edukia, jabari publikoko lanak, lizentzia libreko lanak edo, legeak baimentzen duenean, kopia pertsonalak soilik.</string>
+    <string name="web_address">Web-helbidea</string>
+    <string name="save_as">Gorde honela</string>
+    <string name="quality_audio_mp3">Audioa (MP3)</string>
+    <string name="quality_video_mp4">Bideoa (MP4, 1080p arte)</string>
+    <string name="change_folder">Aldatu karpeta</string>
+    <string name="no_folder_chosen">Oraindik ez duzu karpetarik aukeratu.</string>
+    <string name="download_button">Deskargatu</string>
+    <string name="cancelling">Bertan behera uzten…</string>
+    <string name="download_cancelled">Deskarga bertan behera utzi da.</string>
+    <string name="update_explainer">YouTube bezalako webguneak sarri aldatzen dira. Deskargek huts egiten badute, eguneratu yt-dlp, deskargak egiten dituen programa.</string>
+    <string name="update_button">Eguneratu yt-dlp</string>
+    <string name="updating">yt-dlp eguneratzen…</string>
+    <string name="update_done">Erantzuna (yt-dlp): %1$s</string>
+    <string name="update_unclear">yt-dlp amaitu da, baina ez du esan zein bertsio duen orain. Deskargek huts egiten jarraitzen badute, sakatu berriro Eguneratu yt-dlp. Horrek ez badu konpontzen, ordeztu aplikazioaren bin karpetako yt-dlp azken bertsioarekin (github.com/yt-dlp/yt-dlp).</string>
+    <string name="update_unclear_last_line">Haren azken mezua: %1$s</string>
+
+    <!-- Download progress. In Basque the percent sign goes before the number. -->
+    <string name="progress_starting">Hasten…</string>
+    <string name="progress_downloading">Deskargatzen…</string>
+    <string name="progress_finishing">Fitxategia amaitzen…</string>
+    <string name="progress_percent">%%1$s</string>
+    <string name="progress_time_left">%1$s falta</string>
+    <string name="decimal_separator">,</string>
+
+    <!-- What each external tool is needed for: completes "Jaitsizazuk ... behar du". -->
+    <string name="tool_purpose_ffmpeg">fitxategiak bihurtzeko eta deskargak amaitzeko</string>
+    <string name="tool_purpose_yt_dlp">deskargatzeko</string>
+    <string name="tool_purpose_deno">YouTubetik deskargatzeko</string>
+
+    <!-- Problems -->
+    <string name="problem_no_file_chosen">Aukeratu bihurtu nahi duzun fitxategia.</string>
+    <string name="problem_not_a_file">Hau ez da fitxategi bat: %1$s</string>
+    <string name="problem_file_not_found">Fitxategi hau ez dago: %1$s</string>
+    <string name="problem_no_free_name">Ez dago izen librerik bihurtutako fitxategiarentzat, jatorrizkoaren ondoan: %1$s</string>
+    <string name="problem_no_web_address">Lehenik, itsatsi bideo edo abesti baten web-helbidea.</string>
+    <string name="problem_not_a_web_address">Hau ez da web-helbide bat: %1$s. https:// edo http:// hasiera izan behar du.</string>
+    <string name="problem_no_folder_chosen">Aukeratu deskarga zein karpetatan gorde.</string>
+    <string name="problem_folder_not_found">Karpeta hau ez dago: %1$s</string>
+    <string name="problem_tool_not_found">Ez da aurkitu %1$s. Jaitsizazuk %2$s behar du. Instalatu %1$s PATHeko karpeta batean, edo jarri %3$s aldagaian %1$s programaren bide-izen osoa, edo kopiatu aplikazioaren karpetara, %4$s gisa. Gero, saiatu berriro. PATH edo %3$s aldatu badituzu, berrabiarazi Jaitsizazu lehenago.</string>
+    <string name="problem_tool_not_at_configured_path">%1$s aldagaiaren balioa %2$s da, baina han ez dago %3$s programarik.</string>
+    <string name="problem_tool_did_not_start">Ezin izan da %1$s abiarazi (%2$s).</string>
+    <string name="problem_tool_read_only">Zure erabiltzaileak ezin du %1$s aldatu (%2$s), eta beraz Jaitsizazuk ezin du eguneratu. Eguneratu instalatu zen modu berean (adibidez, pakete-kudeatzailearekin), edo jarri zuk alda dezakezun kopia bat aplikazioaren bin karpetan.</string>
+    <string name="problem_file_already_exists">Fitxategi hau badago jada: %1$s. Ez da ezer gainidatzi.</string>
+    <string name="problem_cannot_create_file">Ezin izan da fitxategi hau sortu: %1$s</string>
+    <string name="problem_cannot_save_into">Ezin da karpeta honetan gorde: %1$s</string>
+    <string name="problem_conversion_failed">Bihurketak huts egin du (ffmpeg irteera-kodea: %1$s).</string>
+    <string name="problem_download_failed">Deskargak huts egin du (yt-dlp irteera-kodea: %1$s).</string>
+    <string name="problem_no_file_reported">yt-dlp amaitu da, baina ez du fitxategirik adierazi.</string>
+    <string name="problem_already_in_folder">Karpeta honetan badago jada: %1$s. Ez da ezer gainidatzi.</string>
+    <string name="problem_already_in_folder_as">Karpeta honetan badago jada, %2$s izenarekin: %1$s. Ez da ezer gainidatzi.</string>
+    <string name="problem_update_failed">yt-dlp ezin izan da eguneratu (irteera-kodea: %1$s).</string>
+    <string name="problem_unexpected">Ustekabeko errorea: %1$s</string>
+    <string name="leftover_unfinished_file">Ezin izan da amaitu gabeko fitxategi hau ezabatu: %1$s</string>
+    <string name="leftover_temporary_folder">Aldi baterako fitxategi batzuk ezin izan dira ezabatu: %1$s. Karpeta hori zuk ezaba dezakezu.</string>
+
+    <!-- Desktop dialogs -->
+    <string name="choose_file_title">Aukeratu audio-fitxategi bat</string>
+    <string name="choose_folder_title">Aukeratu deskargak non gorde</string>
+    <string name="choose_folder_approve">Aukeratu</string>
+    <string name="crash_intro">Jaitsizazuk ustekabeko errore bat izan du:</string>
+    <string name="crash_details_saved">Xehetasunak hemen gorde dira: %1$s</string>
+    <string name="crash_details_not_saved">Ezin izan dira xehetasunak hemen gorde: %1$s</string>
+</resources>

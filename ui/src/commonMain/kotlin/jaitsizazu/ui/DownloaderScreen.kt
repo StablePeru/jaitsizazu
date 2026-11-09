@@ -25,15 +25,31 @@ import jaitsizazu.core.DownloadProgress
 import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.Leftover
 import jaitsizazu.core.fileNameOf
-
-/** Shown on the download screen at all times. */
-const val DOWNLOAD_LEGAL_NOTE =
-    "Download only your own content, public domain or freely licensed works, or personal copies where the law allows."
+import jaitsizazu.ui.resources.Res
+import jaitsizazu.ui.resources.cancel
+import jaitsizazu.ui.resources.cancelling
+import jaitsizazu.ui.resources.change_folder
+import jaitsizazu.ui.resources.download_button
+import jaitsizazu.ui.resources.download_cancelled
+import jaitsizazu.ui.resources.download_title
+import jaitsizazu.ui.resources.legal_note
+import jaitsizazu.ui.resources.no_folder_chosen
+import jaitsizazu.ui.resources.save_as
+import jaitsizazu.ui.resources.saved_as
+import jaitsizazu.ui.resources.update_button
+import jaitsizazu.ui.resources.update_done
+import jaitsizazu.ui.resources.update_explainer
+import jaitsizazu.ui.resources.update_unclear
+import jaitsizazu.ui.resources.update_unclear_last_line
+import jaitsizazu.ui.resources.updating
+import jaitsizazu.ui.resources.web_address
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The downloader screen. Stateless: it shows [state] and reports user actions
  * through the callbacks. The caller owns the state and the folder chooser.
- * While a download runs, a Cancel button reports [onCancel].
+ * While a download runs, a Cancel button reports [onCancel]. The legal note
+ * is always shown.
  */
 @Composable
 fun DownloaderScreen(
@@ -51,36 +67,44 @@ fun DownloaderScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Download from a web address", style = MaterialTheme.typography.h5)
-        Text(DOWNLOAD_LEGAL_NOTE, style = MaterialTheme.typography.body2)
+        Text(stringResource(Res.string.download_title), style = MaterialTheme.typography.h5)
+        Text(stringResource(Res.string.legal_note), style = MaterialTheme.typography.body2)
 
         SetupWarnings(state.setupWarnings)
 
         OutlinedTextField(
             value = state.url,
             onValueChange = onUrlChange,
-            label = { Text("Web address") },
+            label = { Text(stringResource(Res.string.web_address)) },
             placeholder = { Text("https://") },
             singleLine = true,
             enabled = idle,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text("Save as", style = MaterialTheme.typography.subtitle1)
-        ChoiceGroup(DownloadQuality.entries, state.quality, idle, { it.label }, onQualitySelected)
+        Text(stringResource(Res.string.save_as), style = MaterialTheme.typography.subtitle1)
+        ChoiceGroup(
+            options = DownloadQuality.entries,
+            selected = state.quality,
+            enabled = idle,
+            label = { qualityLabel(it) },
+            onSelected = onQualitySelected,
+        )
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onChooseFolder, enabled = idle) { Text("Change folder") }
+            OutlinedButton(onClick = onChooseFolder, enabled = idle) { Text(stringResource(Res.string.change_folder)) }
             Text(
-                text = state.outputDirectory.ifBlank { "No folder chosen yet." },
+                text = state.outputDirectory.ifBlank { stringResource(Res.string.no_folder_chosen) },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onDownload, enabled = state.canDownload) { Text("Download") }
-            if (state.status is DownloadStatus.Downloading) OutlinedButton(onClick = onCancel) { Text("Cancel") }
+            Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(Res.string.download_button)) }
+            if (state.status is DownloadStatus.Downloading) {
+                OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.cancel)) }
+            }
         }
 
         DownloadStatusBlock(state.status)
@@ -101,10 +125,10 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
             } else {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            Text(progressText(status.progress))
+            Text(progressText(status.progress, progressWords()))
         }
         is DownloadStatus.Done -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Saved as ${fileNameOf(status.outputPath)}")
+            Text(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)))
             SelectionContainer { Text(status.outputPath, style = MaterialTheme.typography.body2) }
         }
         is DownloadStatus.Failed -> SelectionContainer {
@@ -112,10 +136,10 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
         }
         DownloadStatus.Cancelling -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text("Cancelling…")
+            Text(stringResource(Res.string.cancelling))
         }
         is DownloadStatus.Cancelled -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Download cancelled.")
+            Text(stringResource(Res.string.download_cancelled))
             status.leftoverFolder?.let { folder ->
                 SelectionContainer {
                     Text(leftoverText(Leftover.TemporaryFolder(folder, detail = null)), color = MaterialTheme.colors.error)
@@ -128,21 +152,15 @@ private fun DownloadStatusBlock(status: DownloadStatus) {
 @Composable
 private fun UpdateBlock(update: UpdateStatus, enabled: Boolean, onUpdate: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Sites such as YouTube change often. If downloads stop working, update yt-dlp, the download engine.",
-            style = MaterialTheme.typography.body2,
-        )
-        OutlinedButton(onClick = onUpdate, enabled = enabled) { Text("Update yt-dlp") }
+        Text(stringResource(Res.string.update_explainer), style = MaterialTheme.typography.body2)
+        OutlinedButton(onClick = onUpdate, enabled = enabled) { Text(stringResource(Res.string.update_button)) }
         when (update) {
             UpdateStatus.Idle -> Unit
-            UpdateStatus.Updating -> Text("Updating yt-dlp…")
-            is UpdateStatus.Done -> SelectionContainer { Text(update.toolReport) }
+            UpdateStatus.Updating -> Text(stringResource(Res.string.updating))
+            is UpdateStatus.Done -> SelectionContainer { Text(stringResource(Res.string.update_done, update.toolReport)) }
             is UpdateStatus.Unclear -> SelectionContainer {
-                val lastLine = update.lastLine?.let { "Its last message was: $it" }
-                val unclear = "yt-dlp finished without saying which version it has now. " +
-                    "If downloads still fail, click Update yt-dlp again. If that does not help, " +
-                    "replace yt-dlp in the bin folder of the app with the latest release from github.com/yt-dlp/yt-dlp."
-                Text(listOfNotNull(unclear, lastLine).joinToString("\n"))
+                val lastLine = update.lastLine?.let { stringResource(Res.string.update_unclear_last_line, it) }
+                Text(listOfNotNull(stringResource(Res.string.update_unclear), lastLine).joinToString("\n"))
             }
             is UpdateStatus.Failed -> SelectionContainer {
                 Text(problemText(update.problem), color = MaterialTheme.colors.error)
@@ -150,9 +168,3 @@ private fun UpdateBlock(update: UpdateStatus, enabled: Boolean, onUpdate: () -> 
         }
     }
 }
-
-private val DownloadQuality.label: String
-    get() = when (this) {
-        DownloadQuality.AUDIO_MP3 -> "Audio (MP3)"
-        DownloadQuality.VIDEO_MP4 -> "Video (MP4, up to 1080p)"
-    }

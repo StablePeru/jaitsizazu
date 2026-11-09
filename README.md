@@ -2,28 +2,34 @@
 
 Jaitsizazu will download audio and video from YouTube and similar sites, and convert your own audio and video files. One minimal app for desktop (Windows and Linux) and Android, with no ads, no telemetry and no accounts. For example, it will turn a WhatsApp voice note (Ogg Opus) into a WAV file you can drop into Ableton Live. It is part of DanonAA.
 
-> **Status:** the desktop app converts files and downloads from web addresses. Conversions are tested against real ffmpeg, and downloads against real yt-dlp with a local test server, inside Docker. The downloader has not been tried against YouTube from the app yet. Android and installers are not done yet.
+> **Status:** the desktop app converts files and downloads from web addresses, in Basque. Conversions are tested against real ffmpeg, and downloads against real yt-dlp with a local test server, inside Docker. The downloader has not been tried against YouTube from the app yet. Android and installers are not done yet.
+
+## Language
+
+The app speaks Basque (euskara), whatever the language of your system. English is built in as a second language, but there is no setting to choose it yet. The Basque texts are proposals still under review: [docs/translations-eu.md](docs/translations-eu.md) lists every text in both languages.
+
+The steps below name the buttons in English, with the Basque text in brackets.
 
 ## Convert a file (desktop)
 
-1. Click **Choose file** and pick an audio file, for example a WhatsApp voice note.
+1. Click **Choose file** (*Aukeratu fitxategia*) and pick an audio file, for example a WhatsApp voice note.
 2. Pick the format: WAV (the default), MP3, FLAC or Ogg Vorbis.
-3. Click **Convert**. While it runs, **Cancel** stops it and removes the unfinished file.
+3. Click **Convert** (*Bihurtu*). While it runs, **Cancel** (*Utzi*) stops it and removes the unfinished file.
 
 The new file is saved next to the original. Nothing is ever overwritten: if `memo.wav` exists, you get `memo (1).wav`.
 
 ## Download from a web address (desktop)
 
-Open the **Download** tab.
+Open the **Download** tab (*Deskargatu*).
 
 1. Paste the web address of a video or a song.
 2. Pick **Audio (MP3)** (the default) or **Video (MP4, up to 1080p)**.
-3. The file goes to your `Downloads` folder. **Change folder** picks another one.
-4. Click **Download**. A bar shows the progress, the speed and the time left. **Cancel** stops it and removes the unfinished files.
+3. The file goes to your `Downloads` folder. **Change folder** (*Aldatu karpeta*) picks another one.
+4. Click **Download** (*Deskargatu*). A bar shows the progress, the speed and the time left. **Cancel** (*Utzi*) stops it and removes the unfinished files.
 
 Only single videos are downloaded, never whole playlists. Nothing is ever overwritten: if the file is already in the folder, the app says so and leaves it alone. While a download runs, its partial files sit in a `.jaitsizazu-…` folder inside the chosen folder, and that folder is removed when the download ends.
 
-Sites such as YouTube change often, and an old yt-dlp stops working with them. **Update yt-dlp** replaces the yt-dlp that the app uses with the latest stable release, in place. If that yt-dlp is read-only for you (for example, installed system-wide), the app says so and changes nothing: update it the way you installed it.
+Sites such as YouTube change often, and an old yt-dlp stops working with them. **Update yt-dlp** (*Eguneratu yt-dlp*) replaces the yt-dlp that the app uses with the latest stable release, in place. If that yt-dlp is read-only for you (for example, installed system-wide), the app says so and changes nothing: update it the way you installed it.
 
 ## External tools
 
@@ -57,7 +63,7 @@ yt-dlp always runs with `--ignore-config`, `--no-plugin-dirs` and `--no-remote-c
 
 ## Intended use and legal note
 
-The download screen always shows this line: *Download only your own content, public domain or freely licensed works, or personal copies where the law allows.*
+The download screen always shows this line, in Basque: *Deskargatu zure edukia, jabari publikoko lanak, lizentzia libreko lanak edo, legeak baimentzen duenean, kopia pertsonalak soilik.* In English: *Download only your own content, public domain or freely licensed works, or personal copies where the law allows.*
 
 Use Jaitsizazu for:
 
@@ -125,7 +131,7 @@ Hexagonal. The `core` module holds pure domain code: formats, requests, the `Con
 | Module | Content |
 |--------|---------|
 | `core` | Kotlin Multiplatform domain code, no I/O and no UI. |
-| `ui` | Kotlin Multiplatform Compose UI: plain state holders and stateless screens. JVM target only for now. |
+| `ui` | Kotlin Multiplatform Compose UI: plain state holders, stateless screens and every user-facing text, as Compose resources (Basque in `values/`, English in `values-en/`). JVM target only for now. |
 | `engine-desktop` | Desktop engine adapters: finds and runs ffmpeg and yt-dlp, and reads yt-dlp's progress. |
 | `desktopApp` | Compose desktop app for Windows and Linux, with the Convert and Download tabs. It wires the engine into the UI and owns the file and folder dialogs. |
 

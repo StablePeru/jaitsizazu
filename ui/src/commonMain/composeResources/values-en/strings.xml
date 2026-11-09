@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English texts. Basque, in values/strings.xml, is the default language.
+  Every key here must also be in values/strings.xml, with the same %N$s
+  placeholders: StringResourcesTest checks it. Paths, addresses and the output
+  of ffmpeg and yt-dlp are shown as they are and never live in this file.
+-->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_convert">Convert</string>
+    <string name="tab_download">Download</string>
+
+    <!-- Shared -->
+    <string name="cancel">Cancel</string>
+    <string name="saved_as">Saved as %1$s</string>
+
+    <!-- Convert screen -->
+    <string name="convert_title">Convert an audio file</string>
+    <string name="choose_file">Choose file</string>
+    <string name="no_file_chosen">No file chosen yet.</string>
+    <string name="convert_to">Convert to</string>
+    <string name="convert_button">Convert</string>
+    <string name="converting">Converting…</string>
+    <string name="conversion_cancelled">Conversion cancelled.</string>
+
+    <!-- Download screen -->
+    <string name="download_title">Download from a web address</string>
+    <string name="legal_note">Download only your own content, public domain or freely licensed works, or personal copies where the law allows.</string>
+    <string name="web_address">Web address</string>
+    <string name="save_as">Save as</string>
+    <string name="quality_audio_mp3">Audio (MP3)</string>
+    <string name="quality_video_mp4">Video (MP4, up to 1080p)</string>
+    <string name="change_folder">Change folder</string>
+    <string name="no_folder_chosen">No folder chosen yet.</string>
+    <string name="download_button">Download</string>
+    <string name="cancelling">Cancelling…</string>
+    <string name="download_cancelled">Download cancelled.</string>
+    <string name="update_explainer">Sites such as YouTube change often. If downloads stop working, update yt-dlp, the download engine.</string>
+    <string name="update_button">Update yt-dlp</string>
+    <string name="updating">Updating yt-dlp…</string>
+    <string name="update_done">Answer from yt-dlp: %1$s</string>
+    <string name="update_unclear">yt-dlp finished without saying which version it has now. If downloads still fail, click Update yt-dlp again. If that does not help, replace yt-dlp in the bin folder of the app with the latest release from github.com/yt-dlp/yt-dlp.</string>
+    <string name="update_unclear_last_line">Its last message was: %1$s</string>
+
+    <!-- Download progress -->
+    <string name="progress_starting">Starting…</string>
+    <string name="progress_downloading">Downloading…</string>
+    <string name="progress_finishing">Finishing the file…</string>
+    <string name="progress_percent">%1$s%</string>
+    <string name="progress_time_left">%1$s left</string>
+    <string name="decimal_separator">.</string>
+
+    <!-- What each external tool is needed for: completes "Jaitsizazu needs it to ..." -->
+    <string name="tool_purpose_ffmpeg">convert files and to finish downloads</string>
+    <string name="tool_purpose_yt_dlp">download</string>
+    <string name="tool_purpose_deno">download from YouTube</string>
+
+    <!-- Problems -->
+    <string name="problem_no_file_chosen">Choose a file to convert.</string>
+    <string name="problem_not_a_file">%1$s is not a file.</string>
+    <string name="problem_file_not_found">The file %1$s does not exist.</string>
+    <string name="problem_no_free_name">No free name left for the converted file next to %1$s.</string>
+    <string name="problem_no_web_address">Paste the web address of a video or a song first.</string>
+    <string name="problem_not_a_web_address">%1$s is not a web address. It must start with https:// or http://.</string>
+    <string name="problem_no_folder_chosen">Choose a folder to save the download in.</string>
+    <string name="problem_folder_not_found">The folder %1$s does not exist.</string>
+    <string name="problem_tool_not_found">%1$s was not found. Jaitsizazu needs it to %2$s. Install %1$s so that it is on your PATH, or set %3$s to the full path of the %1$s binary, or put it in the app folder as %4$s. Then try again. If you changed PATH or %3$s, restart Jaitsizazu first.</string>
+    <string name="problem_tool_not_at_configured_path">%1$s is set to %2$s, but there is no executable %3$s there.</string>
+    <string name="problem_tool_did_not_start">Could not start %1$s (%2$s).</string>
+    <string name="problem_tool_read_only">%1$s at %2$s is read-only for your user, so Jaitsizazu cannot update it. Update it the way it was installed (for example, with your package manager), or put a copy you can write to in the bin folder of the app.</string>
+    <string name="problem_file_already_exists">%1$s already exists. Nothing was overwritten.</string>
+    <string name="problem_cannot_create_file">Could not create %1$s.</string>
+    <string name="problem_cannot_save_into">Cannot save into %1$s.</string>
+    <string name="problem_conversion_failed">The conversion failed (ffmpeg exit code %1$s).</string>
+    <string name="problem_download_failed">The download failed (yt-dlp exit code %1$s).</string>
+    <string name="problem_no_file_reported">yt-dlp finished, but it reported no file.</string>
+    <string name="problem_already_in_folder">%1$s is already in this folder. Nothing was overwritten.</string>
+    <string name="problem_already_in_folder_as">%1$s is already in this folder, as %2$s. Nothing was overwritten.</string>
+    <string name="problem_update_failed">yt-dlp could not update itself (exit code %1$s).</string>
+    <string name="problem_unexpected">Unexpected error: %1$s</string>
+    <string name="leftover_unfinished_file">The unfinished file %1$s could not be removed.</string>
+    <string name="leftover_temporary_folder">Some temporary files could not be removed: %1$s. You can delete that folder.</string>
+
+    <!-- Desktop dialogs -->
+    <string name="choose_file_title">Choose an audio file</string>
+    <string name="choose_folder_title">Choose where to save downloads</string>
+    <string name="choose_folder_approve">Choose</string>
+    <string name="crash_intro">Jaitsizazu ran into an unexpected error:</string>
+    <string name="crash_details_saved">Details were saved to %1$s.</string>
+    <string name="crash_details_not_saved">Details could not be saved to %1$s.</string>
+</resources>

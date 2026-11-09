@@ -1,9 +1,41 @@
 package jaitsizazu.ui
 
 import androidx.compose.runtime.Composable
+import jaitsizazu.core.DownloadQuality
 import jaitsizazu.core.Leftover
 import jaitsizazu.core.Problem
 import jaitsizazu.core.Tool
+import jaitsizazu.ui.resources.Res
+import jaitsizazu.ui.resources.leftover_temporary_folder
+import jaitsizazu.ui.resources.leftover_unfinished_file
+import jaitsizazu.ui.resources.problem_already_in_folder
+import jaitsizazu.ui.resources.problem_already_in_folder_as
+import jaitsizazu.ui.resources.problem_cannot_create_file
+import jaitsizazu.ui.resources.problem_cannot_save_into
+import jaitsizazu.ui.resources.problem_conversion_failed
+import jaitsizazu.ui.resources.problem_download_failed
+import jaitsizazu.ui.resources.problem_file_already_exists
+import jaitsizazu.ui.resources.problem_file_not_found
+import jaitsizazu.ui.resources.problem_folder_not_found
+import jaitsizazu.ui.resources.problem_no_file_chosen
+import jaitsizazu.ui.resources.problem_no_file_reported
+import jaitsizazu.ui.resources.problem_no_folder_chosen
+import jaitsizazu.ui.resources.problem_no_free_name
+import jaitsizazu.ui.resources.problem_no_web_address
+import jaitsizazu.ui.resources.problem_not_a_file
+import jaitsizazu.ui.resources.problem_not_a_web_address
+import jaitsizazu.ui.resources.problem_tool_did_not_start
+import jaitsizazu.ui.resources.problem_tool_not_at_configured_path
+import jaitsizazu.ui.resources.problem_tool_not_found
+import jaitsizazu.ui.resources.problem_tool_read_only
+import jaitsizazu.ui.resources.problem_unexpected
+import jaitsizazu.ui.resources.problem_update_failed
+import jaitsizazu.ui.resources.quality_audio_mp3
+import jaitsizazu.ui.resources.quality_video_mp4
+import jaitsizazu.ui.resources.tool_purpose_deno
+import jaitsizazu.ui.resources.tool_purpose_ffmpeg
+import jaitsizazu.ui.resources.tool_purpose_yt_dlp
+import org.jetbrains.compose.resources.stringResource
 
 // Turns the typed results of core and the engines into words, in the app's
 // language. Paths, addresses, system messages and the output of the external
@@ -17,64 +49,72 @@ internal fun failureText(problem: Problem, leftover: Leftover? = null): String =
 /** The sentence about [problem] in the app's language. */
 @Composable
 internal fun problemText(problem: Problem): String = when (problem) {
-    Problem.NoFileChosen -> "Choose a file to convert."
-    is Problem.NotAFile -> "${problem.path} is not a file."
-    is Problem.FileNotFound -> "The file ${problem.path} does not exist."
-    is Problem.NoFreeName -> "No free name left for the converted file next to ${problem.inputPath}."
-    Problem.NoWebAddress -> "Paste the web address of a video or a song first."
-    is Problem.NotAWebAddress -> "${problem.text} is not a web address. It must start with https:// or http://."
-    Problem.NoFolderChosen -> "Choose a folder to save the download in."
-    is Problem.FolderNotFound -> "The folder ${problem.path} does not exist."
-    is Problem.ToolNotFound -> problem.tool.displayName.let { name ->
-        "$name was not found. Jaitsizazu needs it to ${toolPurpose(problem.tool)}. " +
-            "Install $name so that it is on your PATH, " +
-            "or set ${problem.envVar} to the full path of the $name binary, " +
-            "or put it in the app folder as ${problem.bundledPath}. Then try again. " +
-            "If you changed PATH or ${problem.envVar}, restart Jaitsizazu first."
-    }
-    is Problem.ToolNotAtConfiguredPath ->
-        "${problem.envVar} is set to ${problem.configured}, but there is no executable ${problem.tool.displayName} there."
+    Problem.NoFileChosen -> stringResource(Res.string.problem_no_file_chosen)
+    is Problem.NotAFile -> stringResource(Res.string.problem_not_a_file, problem.path)
+    is Problem.FileNotFound -> stringResource(Res.string.problem_file_not_found, problem.path)
+    is Problem.NoFreeName -> stringResource(Res.string.problem_no_free_name, problem.inputPath)
+    Problem.NoWebAddress -> stringResource(Res.string.problem_no_web_address)
+    is Problem.NotAWebAddress -> stringResource(Res.string.problem_not_a_web_address, problem.text)
+    Problem.NoFolderChosen -> stringResource(Res.string.problem_no_folder_chosen)
+    is Problem.FolderNotFound -> stringResource(Res.string.problem_folder_not_found, problem.path)
+    is Problem.ToolNotFound -> stringResource(
+        Res.string.problem_tool_not_found,
+        problem.tool.displayName,
+        toolPurpose(problem.tool),
+        problem.envVar,
+        problem.bundledPath,
+    )
+    is Problem.ToolNotAtConfiguredPath -> stringResource(
+        Res.string.problem_tool_not_at_configured_path,
+        problem.envVar,
+        problem.configured,
+        problem.tool.displayName,
+    )
     is Problem.ToolDidNotStart ->
-        "Could not start ${problem.tool.displayName} (${problem.path})."
+        stringResource(Res.string.problem_tool_did_not_start, problem.tool.displayName, problem.path)
             .withRawLines(problem.detail)
-    is Problem.ToolReadOnly ->
-        "${problem.tool.displayName} at ${problem.path} is read-only for your user, so Jaitsizazu cannot update it. " +
-            "Update it the way it was installed (for example, with your package manager), " +
-            "or put a copy you can write to in the bin folder of the app."
-    is Problem.FileAlreadyExists -> "${problem.path} already exists. Nothing was overwritten."
+    is Problem.ToolReadOnly -> stringResource(Res.string.problem_tool_read_only, problem.tool.displayName, problem.path)
+    is Problem.FileAlreadyExists -> stringResource(Res.string.problem_file_already_exists, problem.path)
     is Problem.CannotCreateFile ->
-        "Could not create ${problem.path}.".withRawLines(problem.detail)
+        stringResource(Res.string.problem_cannot_create_file, problem.path).withRawLines(problem.detail)
     is Problem.CannotSaveInto ->
-        "Cannot save into ${problem.folder}.".withRawLines(problem.detail)
+        stringResource(Res.string.problem_cannot_save_into, problem.folder).withRawLines(problem.detail)
     is Problem.ConversionFailed ->
-        "The conversion failed (ffmpeg exit code ${problem.exitCode}).".withRawLines(problem.toolOutput)
+        stringResource(Res.string.problem_conversion_failed, problem.exitCode).withRawLines(problem.toolOutput)
     is Problem.DownloadFailed ->
-        "The download failed (yt-dlp exit code ${problem.exitCode}).".withRawLines(problem.toolOutput)
-    Problem.NoFileReported -> "yt-dlp finished, but it reported no file."
+        stringResource(Res.string.problem_download_failed, problem.exitCode).withRawLines(problem.toolOutput)
+    Problem.NoFileReported -> stringResource(Res.string.problem_no_file_reported)
     is Problem.AlreadyInFolder ->
         if (problem.existingName == problem.name) {
-            "${problem.name} is already in this folder. Nothing was overwritten."
+            stringResource(Res.string.problem_already_in_folder, problem.name)
         } else {
-            "${problem.name} is already in this folder, as ${problem.existingName}. Nothing was overwritten."
+            stringResource(Res.string.problem_already_in_folder_as, problem.name, problem.existingName)
         }
     is Problem.UpdateFailed ->
-        "yt-dlp could not update itself (exit code ${problem.exitCode}).".withRawLines(problem.toolOutput)
-    is Problem.Unexpected -> "Unexpected error: ${problem.detail}"
+        stringResource(Res.string.problem_update_failed, problem.exitCode).withRawLines(problem.toolOutput)
+    is Problem.Unexpected -> stringResource(Res.string.problem_unexpected, problem.detail)
 }
 
 /** The sentence about [leftover], with the system's own message on the next line. */
 @Composable
 internal fun leftoverText(leftover: Leftover): String = when (leftover) {
-    is Leftover.UnfinishedFile -> "The unfinished file ${leftover.path} could not be removed."
-    is Leftover.TemporaryFolder -> "Some temporary files could not be removed: ${leftover.path}. You can delete that folder."
+    is Leftover.UnfinishedFile -> stringResource(Res.string.leftover_unfinished_file, leftover.path)
+    is Leftover.TemporaryFolder -> stringResource(Res.string.leftover_temporary_folder, leftover.path)
 }.withRawLines(leftover.detail)
 
 /** Completes "Jaitsizazu needs it to ...", in the app's language. */
 @Composable
 private fun toolPurpose(tool: Tool): String = when (tool) {
-    Tool.FFMPEG -> "convert files and to finish downloads"
-    Tool.YT_DLP -> "download"
-    Tool.DENO -> "download from YouTube"
+    Tool.FFMPEG -> stringResource(Res.string.tool_purpose_ffmpeg)
+    Tool.YT_DLP -> stringResource(Res.string.tool_purpose_yt_dlp)
+    Tool.DENO -> stringResource(Res.string.tool_purpose_deno)
+}
+
+/** The name of [quality] in the list of choices. */
+@Composable
+internal fun qualityLabel(quality: DownloadQuality): String = when (quality) {
+    DownloadQuality.AUDIO_MP3 -> stringResource(Res.string.quality_audio_mp3)
+    DownloadQuality.VIDEO_MP4 -> stringResource(Res.string.quality_video_mp4)
 }
 
 /** This sentence, then [raw] (a system message or a tool's output) as it is, on the next line. */

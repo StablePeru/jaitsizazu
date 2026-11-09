@@ -46,9 +46,25 @@ fun logDirectory(
 }
 
 /**
+ * The words of the crash dialog. They are loaded once, before anything can
+ * crash, so the crash handler never reads resources: [intro] comes before the
+ * error, then [detailsSaved] or [detailsNotSaved], which name the log file.
+ */
+data class CrashTexts(val intro: String, val detailsSaved: String, val detailsNotSaved: String) {
+    companion object {
+        /** The English texts, built in, for when the translated ones cannot be loaded. */
+        fun fallback(logFile: Path) = CrashTexts(
+            intro = "$APP_NAME ran into an unexpected error:",
+            detailsSaved = "Details were saved to $logFile.",
+            detailsNotSaved = "Details could not be saved to $logFile.",
+        )
+    }
+}
+
+/**
  * Default uncaught exception handler. It writes the stack trace to stderr and to
- * [logFile], and calls [showError] once with a short message for the user, so a
- * crash leaves a trace even when the app runs without a console.
+ * [logFile], and calls [showError] once with a short message for the user, in
+ * [texts], so a crash leaves a trace even when the app runs without a console.
  *
  * [logFile] starts empty on the first crash of each launch and keeps every crash
  * of that launch. Its folder is created for the owner only where the file system
@@ -63,6 +79,7 @@ fun logDirectory(
 class CrashReporter(
     private val logFile: Path,
     private val showError: (String) -> Unit,
+    private val texts: CrashTexts = CrashTexts.fallback(logFile),
     private val clock: () -> Instant = Instant::now,
     private val isEventThread: () -> Boolean = EventQueue::isDispatchThread,
     private val runOnEventThread: (() -> Unit) -> Unit = { EventQueue.invokeLater(it) },
@@ -75,8 +92,8 @@ class CrashReporter(
         val saved = log(thread, error)
         if (!dialogShown.compareAndSet(false, true)) return
 
-        val details = if (saved) "Details were saved to $logFile." else "Details could not be saved to $logFile."
-        val message = "$APP_NAME ran into an unexpected error:\n$error\n\n$details"
+        val details = if (saved) texts.detailsSaved else texts.detailsNotSaved
+        val message = "${texts.intro}\n$error\n\n$details"
         val show = {
             runCatching { showError(message) }
             Unit

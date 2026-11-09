@@ -20,7 +20,7 @@ internal fun <T> ChoiceGroup(
     options: List<T>,
     selected: T,
     enabled: Boolean,
-    label: (T) -> String,
+    label: @Composable (T) -> String,
     onSelected: (T) -> Unit,
 ) {
     Column(Modifier.selectableGroup()) {

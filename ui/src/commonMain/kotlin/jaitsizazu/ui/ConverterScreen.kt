@@ -20,6 +20,17 @@ import androidx.compose.ui.unit.dp
 import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.Problem
 import jaitsizazu.core.fileNameOf
+import jaitsizazu.ui.resources.Res
+import jaitsizazu.ui.resources.cancel
+import jaitsizazu.ui.resources.choose_file
+import jaitsizazu.ui.resources.conversion_cancelled
+import jaitsizazu.ui.resources.convert_button
+import jaitsizazu.ui.resources.convert_title
+import jaitsizazu.ui.resources.convert_to
+import jaitsizazu.ui.resources.converting
+import jaitsizazu.ui.resources.no_file_chosen
+import jaitsizazu.ui.resources.saved_as
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The converter screen. Stateless: it shows [state] and reports clicks
@@ -40,25 +51,25 @@ fun ConverterScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Convert an audio file", style = MaterialTheme.typography.h5)
+        Text(stringResource(Res.string.convert_title), style = MaterialTheme.typography.h5)
 
         SetupWarnings(state.setupWarnings)
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onChooseFile, enabled = idle) { Text("Choose file") }
+            OutlinedButton(onClick = onChooseFile, enabled = idle) { Text(stringResource(Res.string.choose_file)) }
             Text(
-                text = state.selectedFile?.let(::fileNameOf) ?: "No file chosen yet.",
+                text = state.selectedFile?.let(::fileNameOf) ?: stringResource(Res.string.no_file_chosen),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
-        Text("Convert to", style = MaterialTheme.typography.subtitle1)
+        Text(stringResource(Res.string.convert_to), style = MaterialTheme.typography.subtitle1)
         ChoiceGroup(AudioFormat.entries, state.format, idle, { it.label }, onFormatSelected)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onConvert, enabled = state.canConvert) { Text("Convert") }
-            if (!idle) OutlinedButton(onClick = onCancel) { Text("Cancel") }
+            Button(onClick = onConvert, enabled = state.canConvert) { Text(stringResource(Res.string.convert_button)) }
+            if (!idle) OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.cancel)) }
         }
 
         StatusLine(state.status)
@@ -77,9 +88,9 @@ internal fun SetupWarnings(problems: List<Problem>) {
 private fun StatusLine(status: ConversionStatus) {
     when (status) {
         ConversionStatus.Idle -> Unit
-        ConversionStatus.Converting -> Text("Converting…")
+        ConversionStatus.Converting -> Text(stringResource(Res.string.converting))
         is ConversionStatus.Done -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Saved as ${fileNameOf(status.outputPath)}")
+            Text(stringResource(Res.string.saved_as, fileNameOf(status.outputPath)))
             SelectionContainer {
                 Text(status.outputPath, style = MaterialTheme.typography.body2)
             }
@@ -87,10 +98,11 @@ private fun StatusLine(status: ConversionStatus) {
         is ConversionStatus.Failed -> SelectionContainer {
             Text(failureText(status.problem, status.leftover), color = MaterialTheme.colors.error)
         }
-        ConversionStatus.Cancelled -> Text("Conversion cancelled.")
+        ConversionStatus.Cancelled -> Text(stringResource(Res.string.conversion_cancelled))
     }
 }
 
+/** Format names are the same in every language. */
 private val AudioFormat.label: String
     get() = when (this) {
         AudioFormat.WAV -> "WAV"
