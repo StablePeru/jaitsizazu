@@ -42,6 +42,8 @@ class ScreenLanguageTest {
         setContent { MaterialTheme { DownloaderScreen(failed, {}, {}, {}, {}, {}, {}) } }
 
         onNodeWithText("Deskargatu web-helbide batetik").assertExists()
+        onNodeWithText("Audioa (WAV, galera gehiagorik gabe, editatzeko)").assertExists()
+        onNodeWithText("Bideoa (kalitate onena, 4K arte)").assertExists()
         // The translated sentence frames yt-dlp's own output, which stays as it is.
         onNodeWithText("Deskargak huts egin du (yt-dlp irteera-kodea: 1).\nERROR: Unsupported URL").assertExists()
         onNodeWithText("Download from a web address").assertDoesNotExist()
@@ -53,6 +55,7 @@ class ScreenLanguageTest {
         setContent { MaterialTheme { DownloaderScreen(failed, {}, {}, {}, {}, {}, {}) } }
 
         onNodeWithText("Download from a web address").assertExists()
+        onNodeWithText("Audio (original, as the site serves it)").assertExists()
         onNodeWithText("The download failed (yt-dlp exit code 1).\nERROR: Unsupported URL").assertExists()
     }
 

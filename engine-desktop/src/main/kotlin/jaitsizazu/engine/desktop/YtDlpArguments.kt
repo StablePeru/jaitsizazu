@@ -54,12 +54,28 @@ object YtDlpArguments {
     private fun qualityArguments(quality: DownloadQuality): List<String> = when (quality) {
         DownloadQuality.AUDIO_MP3 ->
             listOf("-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "2")
+        // PCM in a WAV file: no further loss, and every audio editor opens it.
+        DownloadQuality.AUDIO_WAV ->
+            listOf("-f", "bestaudio/best", "-x", "--audio-format", "wav")
+        // `best` keeps the sound as served. An audio file in a common audio format
+        // (.m4a, .opus, .mp3, ...) is left as it is; otherwise the AAC, Opus, Vorbis,
+        // MP3, FLAC or ALAC stream is copied, not encoded again, into a file of its
+        // own (.m4a, .opus, .ogg, ...). Only a stream in another codec, which YouTube
+        // does not serve, is converted to MP3 by yt-dlp.
+        DownloadQuality.AUDIO_ORIGINAL ->
+            listOf("-f", "bestaudio/best", "-x", "--audio-format", "best")
         // -S prefers the best video up to 1080p (or the smallest above, when
         // there is none), then MP4 video and M4A audio, which merge into MP4
         // without re-encoding.
         DownloadQuality.VIDEO_MP4 ->
             listOf("-f", "bestvideo*+bestaudio/best", "-S", "res:1080,ext:mp4:m4a") +
                 listOf("--merge-output-format", "mp4", "--remux-video", "mp4")
+        // The best video up to 2160p, whatever its codec: at the same height
+        // yt-dlp ranks AV1 and VP9 first. The merged file is MP4 when the codecs fit in MP4, otherwise
+        // MKV, which takes any codec. Nothing is remuxed: an MP4 that cannot
+        // hold the codecs would fail.
+        DownloadQuality.VIDEO_BEST ->
+            listOf("-f", "bestvideo*+bestaudio/best", "-S", "res:2160", "--merge-output-format", "mp4/mkv")
     }
 
     /** The title cut to 150 bytes, so the name stays valid on every file system, and the video ID. */

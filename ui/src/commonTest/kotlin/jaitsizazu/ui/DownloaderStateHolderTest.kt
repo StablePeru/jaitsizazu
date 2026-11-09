@@ -405,4 +405,13 @@ class DownloaderStateHolderTest {
 
         assertEquals(UpdateStatus.Unclear("WARNING: something"), holder.state.value.update)
     }
+
+    @Test
+    fun startsWithMp3AndOffersEveryQuality() = runTest {
+        val holder = holder()
+
+        assertEquals(DownloadQuality.AUDIO_MP3, holder.state.value.quality)
+        holder.selectQuality(DownloadQuality.VIDEO_BEST)
+        assertEquals(DownloadQuality.VIDEO_BEST, holder.state.value.quality)
+    }
 }

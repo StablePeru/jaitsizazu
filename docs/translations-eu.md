@@ -28,7 +28,12 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 | `web_address` | Web address | Web-helbidea |
 | `save_as` | Save as | Gorde honela |
 | `quality_audio_mp3` | Audio (MP3) | Audioa (MP3) |
+| `quality_audio_wav` | Audio (WAV, no further loss, for editing) | Audioa (WAV, galera gehiagorik gabe, editatzeko) |
+| `quality_audio_original` | Audio (original, as the site serves it) | Audioa (jatorrizkoa, webguneak ematen duen bezala) |
+| `quality_audio_original_hint` | Usually an .opus or .m4a file. Ableton Live on Windows may not open it: for Ableton, pick WAV. | Normalean .opus edo .m4a fitxategi bat. Baliteke Windowseko Ableton Livek ez irekitzea: Abletonerako, aukeratu WAV. |
 | `quality_video_mp4` | Video (MP4, up to 1080p) | Bideoa (MP4, 1080p arte) |
+| `quality_video_best` | Video (best quality, up to 4K) | Bideoa (kalitate onena, 4K arte) |
+| `quality_video_best_hint` | Very large files. MP4 when possible, otherwise MKV. VP9 and AV1 videos may need a modern player. | Fitxategi oso handiak. MP4 ahal denean, bestela MKV. VP9 eta AV1 bideoek erreproduzigailu berri bat behar izan dezakete. |
 | `change_folder` | Change folder | Aldatu karpeta |
 | `no_folder_chosen` | No folder chosen yet. | Oraindik ez duzu karpetarik aukeratu. |
 | `download_button` | Download | Deskargatu |

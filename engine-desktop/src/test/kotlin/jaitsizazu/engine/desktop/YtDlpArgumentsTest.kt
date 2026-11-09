@@ -61,22 +61,69 @@ class YtDlpArgumentsTest {
         assertEquals("after_move:${YtDlpOutput.SAVED} %(filepath)s", args.valueOf("--print"))
     }
 
+    /** The arguments that only [quality] decides: everything between the fixed part and `--`. */
+    private fun qualityPart(quality: DownloadQuality): List<String> {
+        val args = build(quality)
+        val afterPrint = args.indexOf("--print") + 2
+        return args.subList(afterPrint, args.indexOf("--"))
+    }
+
     @Test
     fun extractsMp3ForAudio() {
-        val args = build(DownloadQuality.AUDIO_MP3)
+        assertEquals(
+            listOf("-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "2"),
+            qualityPart(DownloadQuality.AUDIO_MP3),
+        )
+    }
 
-        assertTrue("-x" in args)
-        assertEquals("mp3", args.valueOf("--audio-format"))
-        assertFalse("--merge-output-format" in args)
+    @Test
+    fun extractsLosslessWavForEditing() {
+        assertEquals(
+            listOf("-f", "bestaudio/best", "-x", "--audio-format", "wav"),
+            qualityPart(DownloadQuality.AUDIO_WAV),
+        )
+    }
+
+    @Test
+    fun keepsTheOriginalAudioStreamWithoutReEncoding() {
+        // `best` copies AAC, Opus, Vorbis, MP3, FLAC and ALAC streams as they are,
+        // only into an audio file of their own (.m4a, .opus, .ogg, ...).
+        assertEquals(
+            listOf("-f", "bestaudio/best", "-x", "--audio-format", "best"),
+            qualityPart(DownloadQuality.AUDIO_ORIGINAL),
+        )
     }
 
     @Test
     fun mergesMp4UpTo1080pForVideo() {
-        val args = build(DownloadQuality.VIDEO_MP4)
+        assertEquals(
+            listOf(
+                "-f", "bestvideo*+bestaudio/best", "-S", "res:1080,ext:mp4:m4a",
+                "--merge-output-format", "mp4", "--remux-video", "mp4",
+            ),
+            qualityPart(DownloadQuality.VIDEO_MP4),
+        )
+    }
 
-        assertFalse("-x" in args)
-        assertEquals("mp4", args.valueOf("--merge-output-format"))
-        assertTrue(args.valueOf("-S").orEmpty().startsWith("res:1080"), "$args")
+    @Test
+    fun mergesTheBestVideoUpTo4kIntoMp4OrElseMkv() {
+        val args = qualityPart(DownloadQuality.VIDEO_BEST)
+
+        assertEquals(
+            listOf("-f", "bestvideo*+bestaudio/best", "-S", "res:2160", "--merge-output-format", "mp4/mkv"),
+            args,
+        )
+        // Remuxing to MP4 would fail for VP9 or AV1 with Opus: MKV takes any codec.
+        assertFalse("--remux-video" in args, "$args")
+    }
+
+    @Test
+    fun onlyTheAudioOptionsExtractAudio() {
+        for (quality in DownloadQuality.entries) {
+            val isAudio = quality.name.startsWith("AUDIO_")
+            assertEquals(isAudio, "-x" in build(quality), "$quality")
+            assertEquals(!isAudio, "--merge-output-format" in build(quality), "$quality")
+        }
     }
 
     @Test

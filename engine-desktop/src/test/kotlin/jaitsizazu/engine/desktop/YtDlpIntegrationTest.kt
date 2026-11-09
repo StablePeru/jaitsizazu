@@ -52,6 +52,9 @@ class YtDlpIntegrationTest {
     private val stalled = CountDownLatch(1)
     private lateinit var server: HttpServer
     private lateinit var ytDlp: ToolLookup.Found
+    private lateinit var ffmpeg: ToolLookup.Found
+    private lateinit var clip: Path
+    private lateinit var voice: Path
     private lateinit var downloader: YtDlpDownloader
     private val progress = CopyOnWriteArrayList<DownloadProgress>()
 
@@ -63,29 +66,30 @@ class YtDlpIntegrationTest {
 
     @BeforeTest
     fun setUp() = runBlocking {
-        val ffmpeg = found(ExternalTool.FFMPEG)
+        ffmpeg = found(ExternalTool.FFMPEG)
         ytDlp = found(ExternalTool.YT_DLP)
         val noDeno = ToolLookup.NotFound(Problem.ToolNotFound(Tool.DENO, ExternalTool.DENO.envVar, "bin/deno"))
         downloader = YtDlpDownloader({ ytDlp }, { ffmpeg }, { noDeno }, SystemProcessRunner())
 
-        // A one-second video with sound, like a short clip on a website.
-        val clip = dir.resolve("clip.mp4")
-        val made = SystemProcessRunner().run(
-            listOf(
-                ffmpeg.path, "-hide_banner", "-nostdin", "-loglevel", "error",
-                "-f", "lavfi", "-i", "testsrc=size=320x240:rate=10:duration=1",
-                "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
-                "-c:v", "mpeg4", "-c:a", "aac", "-shortest", clip.toString(),
-            ),
+        // A one-second video with AAC sound, like a short clip on a website.
+        clip = dir.resolve("clip.mp4")
+        makeWithFfmpeg(
+            "-f", "lavfi", "-i", "testsrc=size=320x240:rate=10:duration=1",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+            "-c:v", "mpeg4", "-c:a", "aac", "-shortest", clip.toString(),
         )
-        assertEquals(0, made.exitCode, made.stderrTail)
         val clipBytes = clip.readBytes()
+        // One second of Opus sound in WebM, like the audio-only streams of YouTube.
+        voice = dir.resolve("voice.webm")
+        makeWithFfmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "libopus", voice.toString())
+        val voiceBytes = voice.readBytes()
 
         server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
         server.createContext("/clip.mp4") { exchange -> exchange.serve(clipBytes) }
+        server.createContext("/voice.webm") { exchange -> exchange.serve(voiceBytes, contentType = "audio/webm") }
         // Sends the start of a large file, then waits: a download that never ends.
         server.createContext("/stalled.mp4") { exchange ->
-            exchange.serve(ByteArray(STALLED_SIZE), sendOnly = 256 * 1024) { stalled.await(60, TimeUnit.SECONDS) }
+            exchange.serve(ByteArray(STALLED_SIZE), sendOnly = 256 * 1024, thenWait = { stalled.await(60, TimeUnit.SECONDS) })
         }
         server.executor = Executors.newCachedThreadPool { Thread(it).apply { isDaemon = true } }
         server.start()
@@ -99,8 +103,34 @@ class YtDlpIntegrationTest {
         dir.deleteRecursively()
     }
 
-    private fun HttpExchange.serve(body: ByteArray, sendOnly: Int = body.size, thenWait: () -> Unit = {}) {
-        responseHeaders.add("Content-Type", "video/mp4")
+    private suspend fun makeWithFfmpeg(vararg arguments: String) {
+        val made = SystemProcessRunner().run(listOf(ffmpeg.path, "-hide_banner", "-nostdin", "-loglevel", "error") + arguments)
+        assertEquals(0, made.exitCode, made.stderrTail)
+    }
+
+    /**
+     * A hash of the encoded packets of the first audio stream in [file]. It
+     * stays the same when a stream is only copied into another container, and
+     * changes when the sound is decoded and encoded again.
+     */
+    private fun audioPacketHash(file: Path): String = runBlocking {
+        val lines = CopyOnWriteArrayList<String>()
+        val outcome = SystemProcessRunner().run(
+            listOf(ffmpeg.path, "-hide_banner", "-nostdin", "-loglevel", "error", "-i", file.toString()) +
+                listOf("-map", "0:a:0", "-c", "copy", "-f", "streamhash", "-hash", "md5", "-"),
+            lines::add,
+        )
+        assertEquals(0, outcome.exitCode, outcome.stderrTail)
+        lines.single { it.startsWith("0,a,") }
+    }
+
+    private fun HttpExchange.serve(
+        body: ByteArray,
+        sendOnly: Int = body.size,
+        contentType: String = "video/mp4",
+        thenWait: () -> Unit = {},
+    ) {
+        responseHeaders.add("Content-Type", contentType)
         if (requestMethod == "HEAD") {
             responseHeaders.add("Content-Length", body.size.toString())
             sendResponseHeaders(200, -1)
@@ -148,6 +178,49 @@ class YtDlpIntegrationTest {
         assertTrue(id3 || frameSync, "not an MP3 file")
         assertEquals(listOf(saved), out.listDirectoryEntries())
         assertTrue(DownloadProgress.Processing in progress, "the conversion step was not reported: $progress")
+    }
+
+    @Test
+    fun downloadsTheAudioAsWav() {
+        val saved = savedFile(download("/clip.mp4", DownloadQuality.AUDIO_WAV))
+
+        assertTrue(saved.name.endsWith(".wav"), saved.name)
+        val bytes = saved.readBytes()
+        assertEquals("RIFF", bytes.copyOfRange(0, 4).decodeToString())
+        assertEquals("WAVE", bytes.copyOfRange(8, 12).decodeToString())
+        assertEquals(listOf(saved), out.listDirectoryEntries())
+    }
+
+    @Test
+    fun keepsTheOriginalAacAudioWithoutReEncodingIt() {
+        val saved = savedFile(download("/clip.mp4", DownloadQuality.AUDIO_ORIGINAL))
+
+        assertTrue(saved.name.endsWith(".m4a"), saved.name)
+        assertEquals(audioPacketHash(clip), audioPacketHash(saved), "the AAC sound was encoded again")
+        assertEquals(listOf(saved), out.listDirectoryEntries())
+    }
+
+    @Test
+    fun keepsTheOriginalOpusAudioWithoutReEncodingIt() {
+        val saved = savedFile(download("/voice.webm", DownloadQuality.AUDIO_ORIGINAL))
+
+        assertTrue(saved.name.endsWith(".opus"), saved.name)
+        assertEquals(audioPacketHash(voice), audioPacketHash(saved), "the Opus sound was encoded again")
+        assertEquals(listOf(saved), out.listDirectoryEntries())
+    }
+
+    /**
+     * The local server has one file with video and sound, so nothing is merged:
+     * this only shows that the pinned yt-dlp accepts the options of this quality.
+     * Merging into MP4 or MKV needs separate video and audio streams, as on
+     * YouTube, and is not tested here.
+     */
+    @Test
+    fun acceptsTheBestQualityOptions() {
+        val saved = savedFile(download("/clip.mp4", DownloadQuality.VIDEO_BEST))
+
+        assertTrue(saved.name.endsWith(".mp4"), saved.name)
+        assertEquals(listOf(saved), out.listDirectoryEntries())
     }
 
     @Test

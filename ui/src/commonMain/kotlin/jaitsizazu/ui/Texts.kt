@@ -31,6 +31,11 @@ import jaitsizazu.ui.resources.problem_tool_read_only
 import jaitsizazu.ui.resources.problem_unexpected
 import jaitsizazu.ui.resources.problem_update_failed
 import jaitsizazu.ui.resources.quality_audio_mp3
+import jaitsizazu.ui.resources.quality_audio_original
+import jaitsizazu.ui.resources.quality_audio_original_hint
+import jaitsizazu.ui.resources.quality_audio_wav
+import jaitsizazu.ui.resources.quality_video_best
+import jaitsizazu.ui.resources.quality_video_best_hint
 import jaitsizazu.ui.resources.quality_video_mp4
 import jaitsizazu.ui.resources.tool_purpose_deno
 import jaitsizazu.ui.resources.tool_purpose_ffmpeg
@@ -114,7 +119,18 @@ private fun toolPurpose(tool: Tool): String = when (tool) {
 @Composable
 internal fun qualityLabel(quality: DownloadQuality): String = when (quality) {
     DownloadQuality.AUDIO_MP3 -> stringResource(Res.string.quality_audio_mp3)
+    DownloadQuality.AUDIO_WAV -> stringResource(Res.string.quality_audio_wav)
+    DownloadQuality.AUDIO_ORIGINAL -> stringResource(Res.string.quality_audio_original)
     DownloadQuality.VIDEO_MP4 -> stringResource(Res.string.quality_video_mp4)
+    DownloadQuality.VIDEO_BEST -> stringResource(Res.string.quality_video_best)
+}
+
+/** A short note under [quality] in the list of choices, or null when it needs none. */
+@Composable
+internal fun qualityHint(quality: DownloadQuality): String? = when (quality) {
+    DownloadQuality.AUDIO_ORIGINAL -> stringResource(Res.string.quality_audio_original_hint)
+    DownloadQuality.VIDEO_BEST -> stringResource(Res.string.quality_video_best_hint)
+    DownloadQuality.AUDIO_MP3, DownloadQuality.AUDIO_WAV, DownloadQuality.VIDEO_MP4 -> null
 }
 
 /** This sentence, then [raw] (a system message or a tool's output) as it is, on the next line. */

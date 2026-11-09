@@ -89,6 +89,7 @@ fun DownloaderScreen(
             enabled = idle,
             label = { qualityLabel(it) },
             onSelected = onQualitySelected,
+            hint = { qualityHint(it) },
         )
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

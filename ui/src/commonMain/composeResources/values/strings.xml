@@ -31,7 +31,12 @@
     <string name="web_address">Web-helbidea</string>
     <string name="save_as">Gorde honela</string>
     <string name="quality_audio_mp3">Audioa (MP3)</string>
+    <string name="quality_audio_wav">Audioa (WAV, galera gehiagorik gabe, editatzeko)</string>
+    <string name="quality_audio_original">Audioa (jatorrizkoa, webguneak ematen duen bezala)</string>
+    <string name="quality_audio_original_hint">Normalean .opus edo .m4a fitxategi bat. Baliteke Windowseko Ableton Livek ez irekitzea: Abletonerako, aukeratu WAV.</string>
     <string name="quality_video_mp4">Bideoa (MP4, 1080p arte)</string>
+    <string name="quality_video_best">Bideoa (kalitate onena, 4K arte)</string>
+    <string name="quality_video_best_hint">Fitxategi oso handiak. MP4 ahal denean, bestela MKV. VP9 eta AV1 bideoek erreproduzigailu berri bat behar izan dezakete.</string>
     <string name="change_folder">Aldatu karpeta</string>
     <string name="no_folder_chosen">Oraindik ez duzu karpetarik aukeratu.</string>
     <string name="download_button">Deskargatu</string>

@@ -29,7 +29,12 @@
     <string name="web_address">Web address</string>
     <string name="save_as">Save as</string>
     <string name="quality_audio_mp3">Audio (MP3)</string>
+    <string name="quality_audio_wav">Audio (WAV, no further loss, for editing)</string>
+    <string name="quality_audio_original">Audio (original, as the site serves it)</string>
+    <string name="quality_audio_original_hint">Usually an .opus or .m4a file. Ableton Live on Windows may not open it: for Ableton, pick WAV.</string>
     <string name="quality_video_mp4">Video (MP4, up to 1080p)</string>
+    <string name="quality_video_best">Video (best quality, up to 4K)</string>
+    <string name="quality_video_best_hint">Very large files. MP4 when possible, otherwise MKV. VP9 and AV1 videos may need a modern player.</string>
     <string name="change_folder">Change folder</string>
     <string name="no_folder_chosen">No folder chosen yet.</string>
     <string name="download_button">Download</string>

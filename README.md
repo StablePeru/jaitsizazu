@@ -23,9 +23,19 @@ The new file is saved next to the original. Nothing is ever overwritten: if `mem
 Open the **Download** tab (*Deskargatu*).
 
 1. Paste the web address of a video or a song.
-2. Pick **Audio (MP3)** (the default) or **Video (MP4, up to 1080p)**.
+2. Pick what to save. **Audio (MP3)** is the default.
 3. The file goes to your `Downloads` folder. **Change folder** (*Aldatu karpeta*) picks another one.
 4. Click **Download** (*Deskargatu*). A bar shows the progress, the speed and the time left. **Cancel** (*Utzi*) stops it and removes the unfinished files.
+
+The choices go from the most compatible file to the best quality:
+
+| Choice | You get | Good for |
+|--------|---------|----------|
+| Audio (MP3) | An MP3 file. | Playing anywhere. |
+| Audio (WAV) | A WAV file, with no further loss. | Ableton Live and other audio editors. |
+| Audio (original) | The sound as the site serves it, not encoded again: usually `.opus` or `.m4a`. | Keeping the best sound in the smallest file. Ableton Live on Windows may not open these files: pick WAV for Ableton. |
+| Video (MP4, up to 1080p) | An MP4 file, at most 1080p high. | Playing anywhere. |
+| Video (best quality, up to 4K) | The best video up to 2160p: MP4 when its codecs allow it, otherwise MKV. | The best picture. Files can be very large, and VP9 or AV1 video may need a modern player. |
 
 Only single videos are downloaded, never whole playlists. Nothing is ever overwritten: if the file is already in the folder, the app says so and leaves it alone. While a download runs, its partial files sit in a `.jaitsizazu-…` folder inside the chosen folder, and that folder is removed when the download ends.
 
@@ -90,7 +100,7 @@ docker compose run --rm build ./gradlew check     # compile and run the tests
 docker compose run --rm build ./gradlew build     # full build
 ```
 
-Gradle downloads are cached in the `gradle-home` Docker volume. The tests in `engine-desktop` run the image's ffmpeg and yt-dlp for real. The yt-dlp tests download from an HTTP server that the test itself starts on `127.0.0.1`: no test reaches the internet. The Dockerfile pins the yt-dlp version and checks its SHA-256.
+Gradle downloads are cached in the `gradle-home` Docker volume. The tests in `engine-desktop` run the image's ffmpeg and yt-dlp for real. The yt-dlp tests download from an HTTP server that the test itself starts on `127.0.0.1`: no test reaches the internet. That server has no separate video and audio streams, so merging them (the 4K choice on YouTube) is checked only through the yt-dlp arguments. The Dockerfile pins the yt-dlp version and checks its SHA-256.
 
 **Linux: match your user.** The image runs as a user with UID and GID 1000. If your own user has other IDs, the bind-mounted checkout is not writable from the container. Build the image with yours:
 
