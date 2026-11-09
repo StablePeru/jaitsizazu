@@ -27,8 +27,8 @@ interface ProcessRunner {
  * and reads stdout and stderr to the end so a chatty process cannot block on a
  * full pipe. Only the last [maxStderrLines] stderr lines are kept.
  *
- * Cancelling the coroutine kills the process and waits up to [exitTimeout] for
- * it to exit before the cancellation goes on. On Windows a running process
+ * Cancelling the coroutine kills the process and waits once, up to [exitTimeout],
+ * for it to exit before the cancellation goes on. On Windows a running process
  * keeps its output file locked, so the caller can only remove that file once
  * the process is gone. [startProcess] starts the process; tests replace it.
  */
@@ -50,8 +50,8 @@ class SystemProcessRunner(
                     runInterruptible { process.waitFor() }
                 } catch (e: CancellationException) {
                     // Killing the process closes its pipes, so the readers above
-                    // finish and this scope can complete.
-                    killAndAwaitExit(process)
+                    // finish and this scope can complete. `finally` waits for the exit.
+                    process.destroyForcibly()
                     throw e
                 }
                 ProcessOutcome(exitCode, tail.await())

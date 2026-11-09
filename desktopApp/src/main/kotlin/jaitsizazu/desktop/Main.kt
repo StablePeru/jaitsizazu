@@ -18,7 +18,6 @@ import jaitsizazu.ui.ConverterScreen
 import jaitsizazu.ui.ConverterStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -73,11 +72,10 @@ fun main() {
 private fun appDirectory(): Path? =
     System.getProperty("jpackage.app-path")?.let { Path.of(it).toAbsolutePath().parent }
 
-/** Shows [message] in a modal Swing dialog on the event thread. Swing does not need Skiko. */
+/** Shows [message] in a modal Swing dialog. [CrashReporter] calls it on the event thread. Swing does not need Skiko. */
 private fun showErrorDialog(message: String) {
     if (GraphicsEnvironment.isHeadless()) return
-    val show = { JOptionPane.showMessageDialog(null, message, APP_NAME, JOptionPane.ERROR_MESSAGE) }
-    if (EventQueue.isDispatchThread()) show() else EventQueue.invokeAndWait(show)
+    JOptionPane.showMessageDialog(null, message, APP_NAME, JOptionPane.ERROR_MESSAGE)
 }
 
 /** Shows the native file dialog. Returns the chosen path, or null if cancelled. */

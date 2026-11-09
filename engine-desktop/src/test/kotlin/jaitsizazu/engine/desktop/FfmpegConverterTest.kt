@@ -13,6 +13,7 @@ import java.nio.file.AccessDeniedException
 import java.nio.file.FileAlreadyExistsException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -171,6 +172,27 @@ class FfmpegConverterTest {
 
         assertIs<CancellationException>(thrown)
         assertEquals(listOf("/voice/memo.wav"), deleted)
+    }
+
+    @Test
+    fun removesTheClaimedOutputAndRethrowsAnUnexpectedError() = runTest {
+        val runner = FakeRunner { throw IllegalStateException("bug in the runner") }
+
+        val thrown = assertFailsWith<IllegalStateException> { converter(runner).convert(request, "/voice/memo.wav") }
+
+        assertEquals("bug in the runner", thrown.message)
+        assertEquals(listOf("/voice/memo.wav"), deleted)
+    }
+
+    @Test
+    fun aFailedDeleteIsAttachedToAnUnexpectedError() = runTest {
+        val runner = FakeRunner { throw IllegalStateException("bug in the runner") }
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            converter(runner, deleteFile = { throw IOException("busy") }).convert(request, "/voice/memo.wav")
+        }
+
+        assertEquals("busy", thrown.suppressed.single().message)
     }
 
     @Test

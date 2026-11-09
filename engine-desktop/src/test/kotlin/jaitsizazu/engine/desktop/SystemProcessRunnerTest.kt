@@ -53,7 +53,15 @@ class SystemProcessRunnerTest {
             return KILLED
         }
 
-        override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = exited.await(timeout, unit)
+        /** How many times someone waited for this process with a timeout. */
+        @Volatile
+        var timedWaits = 0
+            private set
+
+        override fun waitFor(timeout: Long, unit: TimeUnit): Boolean {
+            timedWaits++
+            return exited.await(timeout, unit)
+        }
 
         override fun exitValue(): Int =
             if (isAlive) throw IllegalThreadStateException("still running") else KILLED
@@ -104,6 +112,16 @@ class SystemProcessRunnerTest {
         cancelWhileWaiting(process, runner)
 
         assertTrue(process.isAlive)
+    }
+
+    @Test
+    fun waitsForAKilledProcessOnlyOnce() = runBlocking {
+        val process = SlowToDieProcess(dieAfterMillis = 60_000)
+        val runner = SystemProcessRunner(startProcess = { process }, exitTimeout = 100.milliseconds)
+
+        cancelWhileWaiting(process, runner)
+
+        assertEquals(1, process.timedWaits, "a cancellation must not wait out the exit timeout twice")
     }
 
     private val java = ProcessHandle.current().info().command().orElseThrow()

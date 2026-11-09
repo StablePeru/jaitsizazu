@@ -3,7 +3,6 @@ package jaitsizazu.engine.desktop
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.MediaConverter
 import jaitsizazu.core.MediaResult
-import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
@@ -23,10 +22,10 @@ import java.nio.file.Path
  * existing file is never overwritten, and ffmpeg (run with `-y`) only ever
  * writes into the file this conversion created.
  *
- * When ffmpeg cannot start, fails or the coroutine is cancelled, that claimed
- * file is removed with [deleteFile], so no partial output sits next to the
- * original. A file that could not be removed is reported: in the failure
- * reason, or as a suppressed exception of the cancellation.
+ * When ffmpeg cannot start, fails, the coroutine is cancelled or anything else
+ * throws, that claimed file is removed with [deleteFile], so no partial output
+ * sits next to the original. A file that could not be removed is reported: in
+ * the failure reason, or as a suppressed exception of what was thrown.
  */
 class FfmpegConverter(
     private val locateFfmpeg: () -> FfmpegLookup,
@@ -40,15 +39,17 @@ class FfmpegConverter(
             is FfmpegLookup.Found -> lookup.path
             is FfmpegLookup.NotFound -> return MediaResult.Failure(lookup.message)
         }
+        val command = listOf(ffmpeg) + FfmpegArguments.build(request.inputPath, outputPath, request.target)
         claim(outputPath)?.let { return it }
 
-        val command = listOf(ffmpeg) + FfmpegArguments.build(request.inputPath, outputPath, request.target)
         val outcome = try {
             runner.run(command)
         } catch (e: IOException) {
             return failureAfterCleanup("Could not start ffmpeg ($ffmpeg): ${e.message}", outputPath)
-        } catch (e: CancellationException) {
-            // The runner returns only once ffmpeg has exited, so the file is no longer in use.
+        } catch (e: Throwable) {
+            // A cancellation, or an error nobody expected. On cancellation SystemProcessRunner
+            // kills ffmpeg and waits a bounded time for it to exit, so on Windows a slow
+            // ffmpeg may still hold the file: then the delete fails and is attached to `e`.
             removeClaimedOutput(outputPath)?.let(e::addSuppressed)
             throw e
         }
