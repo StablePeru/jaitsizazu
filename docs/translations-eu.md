@@ -40,6 +40,7 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 | `download_button` | Download | Deskargatu |
 | `cancelling` | Cancelling… | Bertan behera uzten… |
 | `download_cancelled` | Download cancelled. | Deskarga bertan behera utzi da. |
+| `preparing_engine` | Preparing the download engine. The first start can take a minute. | Deskargak egiten dituen programa prestatzen. Lehen aldian minutu bat behar izan dezake. |
 | `update_explainer` | Sites such as YouTube change often. If downloads stop working, update yt-dlp, the download engine. | YouTube bezalako webguneak sarri aldatzen dira. Deskargek huts egiten badute, eguneratu yt-dlp, deskargak egiten dituen programa. |
 | `update_button` | Update yt-dlp | Eguneratu yt-dlp |
 | `updating` | Updating yt-dlp… | yt-dlp eguneratzen… |

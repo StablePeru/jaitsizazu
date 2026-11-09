@@ -43,6 +43,7 @@
     <string name="download_button">Deskargatu</string>
     <string name="cancelling">Bertan behera uzten…</string>
     <string name="download_cancelled">Deskarga bertan behera utzi da.</string>
+    <string name="preparing_engine">Deskargak egiten dituen programa prestatzen. Lehen aldian minutu bat behar izan dezake.</string>
     <string name="update_explainer">YouTube bezalako webguneak sarri aldatzen dira. Deskargek huts egiten badute, eguneratu yt-dlp, deskargak egiten dituen programa.</string>
     <string name="update_button">Eguneratu yt-dlp</string>
     <string name="updating">yt-dlp eguneratzen…</string>

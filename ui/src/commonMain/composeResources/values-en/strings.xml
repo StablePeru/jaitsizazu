@@ -41,6 +41,7 @@
     <string name="download_button">Download</string>
     <string name="cancelling">Cancelling…</string>
     <string name="download_cancelled">Download cancelled.</string>
+    <string name="preparing_engine">Preparing the download engine. The first start can take a minute.</string>
     <string name="update_explainer">Sites such as YouTube change often. If downloads stop working, update yt-dlp, the download engine.</string>
     <string name="update_button">Update yt-dlp</string>
     <string name="updating">Updating yt-dlp…</string>

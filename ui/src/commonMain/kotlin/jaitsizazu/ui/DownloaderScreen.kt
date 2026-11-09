@@ -35,6 +35,7 @@ import jaitsizazu.ui.resources.download_title
 import jaitsizazu.ui.resources.fixed_folder
 import jaitsizazu.ui.resources.legal_note
 import jaitsizazu.ui.resources.no_folder_chosen
+import jaitsizazu.ui.resources.preparing_engine
 import jaitsizazu.ui.resources.save_as
 import jaitsizazu.ui.resources.saved_as
 import jaitsizazu.ui.resources.update_button
@@ -53,7 +54,8 @@ import org.jetbrains.compose.resources.stringResource
  * is always shown.
  *
  * [onChooseFolder] null means the folder is fixed (on Android): there is no
- * button to change it, and the screen says where files go.
+ * button to change it, and the screen says where files go. While the engine
+ * is still [preparing][DownloaderState.preparing], the screen says so.
  */
 @Composable
 fun DownloaderScreen(
@@ -108,6 +110,8 @@ fun DownloaderScreen(
         } else {
             Text(stringResource(Res.string.fixed_folder, state.outputDirectory))
         }
+
+        if (state.preparing) Text(stringResource(Res.string.preparing_engine))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(Res.string.download_button)) }

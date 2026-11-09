@@ -87,6 +87,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope,
         defaultOutputDirectory = PUBLIC_FOLDER,
         workContext = Dispatchers.IO,
+        // Nothing can run before yt-dlp and Python are unpacked: see init.
+        preparing = true,
     )
 
     /** The folder of the file picked last for conversion, removed when another is picked. */
@@ -100,12 +102,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             engineWarnings = withContext(Dispatchers.IO) {
                 jobs.removeOldSessions()
-                YoutubeDlAndroidSetup.prepare(application, runtime)
+                try {
+                    YoutubeDlAndroidSetup.prepare(application, runtime)
+                } catch (e: Exception) {
+                    // Never leave the downloader waiting for a setup that ended.
+                    listOf(Problem.Unexpected(e.message ?: e::class.java.simpleName))
+                }
             }
             converter.showSetupWarnings(converterWarnings())
-            downloader.showSetupWarnings(engineWarnings)
+            downloader.finishSetup(engineWarnings, failure = downloadBlocker())
         }
     }
+
+    /** The setup problem that stops every download and update: yt-dlp (with Python) is not ready, or the setup broke. */
+    private fun downloadBlocker(): Problem? =
+        engineWarnings.firstOrNull { it is Problem.ToolNotReadyInApp && it.tool == Tool.YT_DLP || it is Problem.Unexpected }
 
     /**
      * Copies the file at [uri], picked by the user, into a job folder under its

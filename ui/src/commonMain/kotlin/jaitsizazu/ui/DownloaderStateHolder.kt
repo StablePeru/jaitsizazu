@@ -38,6 +38,9 @@ import kotlin.coroutines.coroutineContext
  * each report is one atomic state update that only applies while that same
  * download still runs. The work itself runs in [workContext]: the desktop app
  * passes `Dispatchers.IO`.
+ *
+ * When [preparing], the engine is still being set up (on Android): downloads
+ * and updates wait until [finishSetup].
  */
 class DownloaderStateHolder(
     private val downloadMedia: DownloadMedia,
@@ -45,8 +48,10 @@ class DownloaderStateHolder(
     private val scope: CoroutineScope,
     defaultOutputDirectory: String,
     private val workContext: CoroutineContext = EmptyCoroutineContext,
+    preparing: Boolean = false,
 ) {
-    private val mutableState = MutableStateFlow(DownloaderState(outputDirectory = defaultOutputDirectory))
+    private val mutableState =
+        MutableStateFlow(DownloaderState(outputDirectory = defaultOutputDirectory, preparing = preparing))
     val state: StateFlow<DownloaderState> = mutableState.asStateFlow()
 
     /** The running download, so that [cancel] can stop it and wait for it. */
@@ -73,9 +78,22 @@ class DownloaderStateHolder(
         mutableState.update { it.copy(setupWarnings = problems) }
     }
 
+    /**
+     * Ends the engine setup: shows [warnings] like [showSetupWarnings], and
+     * lets downloads and updates run. When [failure] is set, the setup failed:
+     * downloading or updating shows it instead of running.
+     */
+    fun finishSetup(warnings: List<Problem>, failure: Problem? = null) {
+        mutableState.update { it.copy(setupWarnings = warnings, preparing = false, setupFailure = failure) }
+    }
+
     fun download() {
         val current = mutableState.value
         if (!current.canDownload) return
+        current.setupFailure?.let { failure ->
+            mutableState.update { it.copy(status = DownloadStatus.Failed(failure)) }
+            return
+        }
         val request = DownloadRequest(current.url, current.quality, current.outputDirectory)
 
         val download = ActiveDownload()
@@ -148,7 +166,12 @@ class DownloaderStateHolder(
 
     /** Updates the download engine. It cannot be cancelled: stopping halfway could break the engine. */
     fun updateDownloader() {
-        if (!mutableState.value.canUpdate) return
+        val current = mutableState.value
+        if (!current.canUpdate) return
+        current.setupFailure?.let { failure ->
+            mutableState.update { it.copy(update = UpdateStatus.Failed(failure)) }
+            return
+        }
 
         mutableState.update { it.copy(update = UpdateStatus.Updating) }
         scope.launch {

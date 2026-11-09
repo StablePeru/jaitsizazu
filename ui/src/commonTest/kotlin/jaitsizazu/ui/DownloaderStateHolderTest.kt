@@ -110,12 +110,17 @@ class DownloaderStateHolderTest {
     private val music = "/home/me/Music"
     private val url = "https://example.org/clip"
 
-    private fun TestScope.holder(downloader: MediaDownloader = FakeDownloader(), updater: DownloaderUpdater = FakeUpdater()) =
+    private fun TestScope.holder(
+        downloader: MediaDownloader = FakeDownloader(),
+        updater: DownloaderUpdater = FakeUpdater(),
+        preparing: Boolean = false,
+    ) =
         DownloaderStateHolder(
             DownloadMedia(downloader) { it == downloads || it == music },
             updater,
             this,
             defaultOutputDirectory = downloads,
+            preparing = preparing,
         )
 
     @Test
@@ -126,6 +131,65 @@ class DownloaderStateHolderTest {
         assertEquals(DownloadQuality.AUDIO_MP3, state.quality)
         assertFalse(state.canDownload)
         assertTrue(state.canUpdate)
+    }
+
+    @Test
+    fun waitsForTheSetupBeforeDownloadingOrUpdating() = runTest {
+        val downloader = FakeDownloader()
+        val updater = FakeUpdater()
+        val holder = holder(downloader, updater, preparing = true)
+        holder.setUrl(url)
+
+        assertTrue(holder.state.value.preparing)
+        assertFalse(holder.state.value.canDownload)
+        assertFalse(holder.state.value.canUpdate)
+        holder.download()
+        holder.updateDownloader()
+        advanceUntilIdle()
+        assertEquals(DownloadStatus.Idle, holder.state.value.status)
+        assertEquals(UpdateStatus.Idle, holder.state.value.update)
+        assertTrue(downloader.requests.isEmpty())
+        assertEquals(0, updater.calls)
+
+        val noQuickJs = Problem.ToolNotReadyInApp(Tool.QUICKJS, "/lib/libqjs.so", detail = null)
+        holder.finishSetup(listOf(noQuickJs))
+        assertFalse(holder.state.value.preparing)
+        assertEquals(listOf(noQuickJs), holder.state.value.setupWarnings)
+        holder.download()
+        advanceUntilIdle()
+        assertEquals(DownloadStatus.Done("$downloads/clip.mp3"), holder.state.value.status)
+    }
+
+    @Test
+    fun showsTheSetupFailureInsteadOfDownloadingOrUpdating() = runTest {
+        val downloader = FakeDownloader()
+        val updater = FakeUpdater()
+        val holder = holder(downloader, updater, preparing = true)
+        val notUnpacked = Problem.ToolNotReadyInApp(Tool.YT_DLP, "/files/yt-dlp", "No space left on device")
+        holder.setUrl(url)
+
+        holder.finishSetup(listOf(notUnpacked), failure = notUnpacked)
+        assertTrue(holder.state.value.canDownload)
+        holder.download()
+        holder.updateDownloader()
+        advanceUntilIdle()
+
+        assertEquals(DownloadStatus.Failed(notUnpacked), holder.state.value.status)
+        assertEquals(UpdateStatus.Failed(notUnpacked), holder.state.value.update)
+        assertTrue(downloader.requests.isEmpty())
+        assertEquals(0, updater.calls)
+        assertEquals(listOf(notUnpacked), holder.state.value.setupWarnings)
+    }
+
+    @Test
+    fun isReadyAtOnceWhenThereIsNoSetupToWaitFor() = runTest {
+        // The desktop app: its tools are looked up on every download.
+        val holder = holder()
+        holder.setUrl(url)
+
+        assertFalse(holder.state.value.preparing)
+        assertTrue(holder.state.value.canDownload)
+        assertTrue(holder.state.value.canUpdate)
     }
 
     @Test

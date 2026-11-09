@@ -74,6 +74,7 @@ class DownloaderScreenRenderTest {
             ready.copy(update = UpdateStatus.Failed(Problem.ToolReadOnly(Tool.YT_DLP, "/usr/bin/yt-dlp"))),
             ready.copy(setupWarnings = listOf(Problem.ToolNotAtConfiguredPath(Tool.YT_DLP, "JAITSIZAZU_YTDLP", "/x"))),
             ready.copy(quality = DownloadQuality.VIDEO_BEST),
+            ready.copy(preparing = true),
         )
         for (state in states) {
             // A blank or uniform image means nothing was drawn.

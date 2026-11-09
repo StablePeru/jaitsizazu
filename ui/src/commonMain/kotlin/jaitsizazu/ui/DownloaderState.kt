@@ -12,6 +12,11 @@ import jaitsizazu.core.Problem
  * [setupWarnings] holds what a startup check found (for example, yt-dlp is
  * missing); the screen explains how to fix each. Like the converter's, they do
  * not block downloading: the engine looks again on every download.
+ *
+ * On Android the download engine is unpacked on the first start. While
+ * [preparing], nothing can be downloaded or updated yet. When that setup
+ * failed, [setupFailure] is the reason, shown instead of downloading or
+ * updating. The desktop app has no such setup: it is never preparing.
  */
 data class DownloaderState(
     val url: String = "",
@@ -20,6 +25,8 @@ data class DownloaderState(
     val status: DownloadStatus = DownloadStatus.Idle,
     val update: UpdateStatus = UpdateStatus.Idle,
     val setupWarnings: List<Problem> = emptyList(),
+    val preparing: Boolean = false,
+    val setupFailure: Problem? = null,
 ) {
     /**
      * A download runs or is still stopping, or an update runs. They never run
@@ -30,10 +37,10 @@ data class DownloaderState(
             update == UpdateStatus.Updating
 
     val canDownload: Boolean
-        get() = url.isNotBlank() && !isBusy
+        get() = url.isNotBlank() && !isBusy && !preparing
 
     val canUpdate: Boolean
-        get() = !isBusy
+        get() = !isBusy && !preparing
 }
 
 sealed interface DownloadStatus {
