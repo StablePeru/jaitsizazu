@@ -114,7 +114,7 @@ docker compose run --rm build ./gradlew build     # full build
 docker compose run --rm build ./gradlew :androidApp:assembleDebug   # Android debug APK
 ```
 
-The debug APK is `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. It holds Python, ffmpeg and QuickJS for 64 and 32-bit ARM phones and for the x86_64 emulator, so it is large. Install it with `adb install`. The Android tests run on the build machine's JVM, with no phone or emulator.
+The debug APKs are in `androidApp/build/outputs/apk/debug/`, one per ABI, because Python, ffmpeg and QuickJS take about 45 MB per ABI: `androidApp-arm64-v8a-debug.apk` (most phones, about 66 MB), `androidApp-armeabi-v7a-debug.apk` (older 32-bit phones) and `androidApp-x86_64-debug.apk` (the emulator). `androidApp-universal-debug.apk` holds all three and runs anywhere, at about 162 MB. `adb shell getprop ro.product.cpu.abi` tells which one a phone needs. Install it with `adb install`. The Android tests run on the build machine's JVM, with no phone or emulator.
 
 Gradle downloads are cached in the `gradle-home` Docker volume. The tests in `engine-desktop` run the image's ffmpeg and yt-dlp for real. The yt-dlp tests download from an HTTP server that the test itself starts on `127.0.0.1`: no test reaches the internet. That server has no separate video and audio streams, so merging them (the 4K choice on YouTube) is checked only through the yt-dlp arguments. The Dockerfile pins the yt-dlp version and checks its SHA-256.
 

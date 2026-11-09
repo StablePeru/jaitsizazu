@@ -29,6 +29,17 @@ android {
         }
     }
 
+    // One APK per ABI, so each phone gets only the binaries it runs (arm64-v8a
+    // is about 66 MB instead of 162 MB), plus a universal APK that runs anywhere.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     packaging {
         // youtubedl-android runs its binaries from the extracted native
         // library folder, so the libraries must be extracted at install.
