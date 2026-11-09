@@ -22,19 +22,19 @@ class FfmpegConverterTest {
     private class FakeRunner(private val answer: () -> ProcessOutcome) : ProcessRunner {
         val commands = mutableListOf<List<String>>()
 
-        override suspend fun run(command: List<String>): ProcessOutcome {
+        override suspend fun run(command: List<String>, onOutputLine: ((String) -> Unit)?): ProcessOutcome {
             commands += command
             return answer()
         }
     }
 
-    private val found = { FfmpegLookup.Found("/usr/bin/ffmpeg") }
+    private val found = { ToolLookup.Found("/usr/bin/ffmpeg") }
     private val request = ConversionRequest("/voice/memo.ogg", AudioFormat.WAV)
     private val claimed = mutableListOf<String>()
     private val deleted = mutableListOf<String>()
 
     private val hanging = object : ProcessRunner {
-        override suspend fun run(command: List<String>): ProcessOutcome = awaitCancellation()
+        override suspend fun run(command: List<String>, onOutputLine: ((String) -> Unit)?): ProcessOutcome = awaitCancellation()
     }
 
     private fun converter(
@@ -77,7 +77,7 @@ class FfmpegConverterTest {
     fun claimsTheOutputBeforeRunningFfmpeg() = runTest {
         val events = mutableListOf<String>()
         val runner = object : ProcessRunner {
-            override suspend fun run(command: List<String>): ProcessOutcome {
+            override suspend fun run(command: List<String>, onOutputLine: ((String) -> Unit)?): ProcessOutcome {
                 events += "run"
                 return ProcessOutcome(0, "")
             }
@@ -102,7 +102,7 @@ class FfmpegConverterTest {
     @Test
     fun reportsAMissingFfmpegWithoutClaimingOrRunningAnything() = runTest {
         val runner = FakeRunner { error("must not run") }
-        val missing = { FfmpegLookup.NotFound("ffmpeg was not found.") }
+        val missing = { ToolLookup.NotFound("ffmpeg was not found.") }
 
         val result = FfmpegConverter(missing, runner, claimFile = { claimed += it }).convert(request, "/voice/memo.wav")
 

@@ -1,11 +1,13 @@
 package jaitsizazu.engine.desktop
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -159,6 +161,40 @@ class SystemProcessRunnerTest {
         }
 
         assertEquals(0, outcome.exitCode)
+    }
+
+    @Test
+    fun passesEveryStdoutAndStderrLineToTheCallback() = runBlocking {
+        val lines = mutableListOf<String>()
+
+        val outcome = SystemProcessRunner().run(listOf("sh", "-c", "echo one; echo two >&2; echo three")) { lines += it }
+
+        assertEquals(0, outcome.exitCode)
+        assertEquals(setOf("one", "two", "three"), lines.toSet())
+        assertEquals(listOf("one", "three"), lines - "two", "stdout lines keep their order")
+        assertEquals("two", outcome.stderrTail)
+    }
+
+    /** Whether [pid] runs and is not a zombie. Reads /proc, so it needs Linux. */
+    private fun isRunning(pid: Long): Boolean {
+        val stat = File("/proc/$pid/stat").takeIf { it.exists() }?.readText() ?: return false
+        return stat.substringAfterLast(") ").firstOrNull() !in listOf('Z', 'X')
+    }
+
+    @Test
+    fun killsTheChildrenOfACancelledProcessToo() = runBlocking {
+        // Like the yt-dlp binary, which runs as a launcher process plus a child.
+        val childPid = CompletableDeferred<Long>()
+        val job = launch(Dispatchers.Default) {
+            SystemProcessRunner().run(listOf("sh", "-c", "sleep 300 >/dev/null 2>&1 & echo \$!; wait")) { line ->
+                line.trim().toLongOrNull()?.let(childPid::complete)
+            }
+        }
+        val pid = withTimeout(30_000) { childPid.await() }
+
+        withTimeout(30_000) { job.cancelAndJoin() }
+
+        withTimeout(10_000) { while (isRunning(pid)) delay(50) }
     }
 
     @Test

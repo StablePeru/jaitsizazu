@@ -4,22 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedButton
-import androidx.compose.material.RadioButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import jaitsizazu.core.AudioFormat
@@ -60,7 +55,7 @@ fun ConverterScreen(
         }
 
         Text("Convert to", style = MaterialTheme.typography.subtitle1)
-        FormatChoice(selected = state.format, enabled = idle, onSelected = onFormatSelected)
+        ChoiceGroup(AudioFormat.entries, state.format, idle, { it.label }, onFormatSelected)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = onConvert, enabled = state.canConvert) { Text("Convert") }
@@ -68,29 +63,6 @@ fun ConverterScreen(
         }
 
         StatusLine(state.status)
-    }
-}
-
-@Composable
-private fun FormatChoice(selected: AudioFormat, enabled: Boolean, onSelected: (AudioFormat) -> Unit) {
-    Column(Modifier.selectableGroup()) {
-        for (format in AudioFormat.entries) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = format == selected,
-                        enabled = enabled,
-                        role = Role.RadioButton,
-                        onClick = { onSelected(format) },
-                    )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = format == selected, onClick = null, enabled = enabled)
-                Text(format.label, modifier = Modifier.padding(start = 8.dp))
-            }
-        }
     }
 }
 

@@ -10,6 +10,8 @@ rem If the log cannot be opened, cmd skips that start command, and the second
 rem start command, after the "or" operator, starts the app without a log.
 setlocal
 set "JAITSIZAZU_FFMPEG=%~dp0bin\ffmpeg.exe"
+set "JAITSIZAZU_YTDLP=%~dp0bin\yt-dlp.exe"
+set "JAITSIZAZU_DENO=%~dp0bin\deno.exe"
 set "JAVAW=%~dp0runtime\bin\javaw.exe"
 set "APP_JARS=%~dp0app\*"
 set "LOG_DIR=%LOCALAPPDATA%\Jaitsizazu"

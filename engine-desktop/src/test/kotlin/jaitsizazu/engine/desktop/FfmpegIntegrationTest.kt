@@ -33,14 +33,14 @@ class FfmpegIntegrationTest {
 
     private lateinit var dir: File
     private lateinit var voiceNote: File
-    private lateinit var ffmpeg: FfmpegLookup.Found
+    private lateinit var ffmpeg: ToolLookup.Found
     private lateinit var converter: FfmpegConverter
 
     @BeforeTest
     fun setUp() = runBlocking {
         dir = Files.createTempDirectory("jaitsizazu-ffmpeg").toFile()
-        val lookup = FfmpegLocator().locate()
-        if (lookup !is FfmpegLookup.Found) fail("These tests need ffmpeg. ${(lookup as FfmpegLookup.NotFound).message}")
+        val lookup = ToolLocator(ExternalTool.FFMPEG).locate()
+        if (lookup !is ToolLookup.Found) fail("These tests need ffmpeg. ${(lookup as ToolLookup.NotFound).message}")
         ffmpeg = lookup
         converter = FfmpegConverter({ ffmpeg }, SystemProcessRunner())
 

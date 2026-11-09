@@ -28,7 +28,7 @@ import java.nio.file.Path
  * the failure reason, or as a suppressed exception of what was thrown.
  */
 class FfmpegConverter(
-    private val locateFfmpeg: () -> FfmpegLookup,
+    private val locateFfmpeg: () -> ToolLookup,
     private val runner: ProcessRunner,
     private val claimFile: (String) -> Unit = { Files.createFile(Path.of(it)) },
     private val deleteFile: (String) -> Unit = { Files.deleteIfExists(Path.of(it)) },
@@ -36,8 +36,8 @@ class FfmpegConverter(
 
     override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
         val ffmpeg = when (val lookup = locateFfmpeg()) {
-            is FfmpegLookup.Found -> lookup.path
-            is FfmpegLookup.NotFound -> return MediaResult.Failure(lookup.message)
+            is ToolLookup.Found -> lookup.path
+            is ToolLookup.NotFound -> return MediaResult.Failure(lookup.message)
         }
         val command = listOf(ffmpeg) + FfmpegArguments.build(request.inputPath, outputPath, request.target)
         claim(outputPath)?.let { return it }
