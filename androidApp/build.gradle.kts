@@ -2,6 +2,8 @@
 // :ui screens, like :desktopApp does for the desktop.
 // A pure Android module: AGP 9 compiles its Kotlin, and the Kotlin
 // Multiplatform plugin cannot be combined with com.android.application.
+import com.android.build.api.variant.HostTestBuilder
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -42,6 +44,13 @@ kotlin {
     jvmToolchain(21)
 }
 
+// The host tests check plain logic, the same in every build type: run them once, for debug.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.hostTests[HostTestBuilder.UNIT_TEST_TYPE]?.enable = false
+    }
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":ui"))
@@ -51,4 +60,6 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.kotlin.test.junit)
 }

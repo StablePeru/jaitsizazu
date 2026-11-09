@@ -190,6 +190,36 @@ class ConverterStateHolderTest {
     }
 
     @Test
+    fun showsAProblemThatStoppedTheConversionFromStarting() = runTest {
+        // On Android 8 and 9, when the user denies the storage permission.
+        val denied = Problem.SavePermissionDenied("Download/Jaitsizazu")
+        val converter = FakeConverter()
+        val holder = holder(converter)
+        holder.selectFile(memo)
+
+        holder.showProblem(denied)
+        advanceUntilIdle()
+
+        assertEquals(ConversionStatus.Failed(denied), holder.state.value.status)
+        assertTrue(converter.requests.isEmpty())
+        assertTrue(holder.state.value.canConvert, "the user cannot try again")
+    }
+
+    @Test
+    fun ignoresAProblemShownWhileConverting() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val holder = holder(FakeConverter(gate))
+        holder.selectFile(memo)
+        holder.convert()
+
+        holder.showProblem(Problem.SavePermissionDenied("Download/Jaitsizazu"))
+        assertEquals(ConversionStatus.Converting, holder.state.value.status)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(holder.state.value.status is ConversionStatus.Done)
+    }
+
+    @Test
     fun cancelStopsAStuckConversion() = runTest {
         val converter = HangingConverter()
         val holder = holder(converter)

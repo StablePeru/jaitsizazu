@@ -80,6 +80,7 @@
     <string name="problem_file_already_exists">Fitxategi hau badago jada: %1$s. Ez da ezer gainidatzi.</string>
     <string name="problem_cannot_create_file">Ezin izan da fitxategi hau sortu: %1$s</string>
     <string name="problem_cannot_save_into">Ezin da karpeta honetan gorde: %1$s</string>
+    <string name="problem_save_permission_denied">Ukatu egin da fitxategiak hemen gordetzeko baimena: %1$s. Ez da ezer hasi. Saiatu berriro eta onartu, edo eman biltegiratze-baimena Jaitsizazuri telefonoaren ezarpenetan.</string>
     <string name="problem_conversion_failed">Bihurketak huts egin du (ffmpeg irteera-kodea: %1$s).</string>
     <string name="problem_download_failed">Deskargak huts egin du (yt-dlp irteera-kodea: %1$s).</string>
     <string name="problem_no_file_reported">yt-dlp amaitu da, baina ez du fitxategirik adierazi.</string>

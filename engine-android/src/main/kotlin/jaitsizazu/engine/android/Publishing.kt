@@ -30,8 +30,8 @@ fun interface MediaPublisher {
     /**
      * Copies [file] into [PUBLIC_FOLDER] under its own name, or under a free
      * variant of it, never over an existing file. Returns where the user finds
-     * it, such as `Download/Jaitsizazu/clip.mp3`. Throws an [IOException] or a
-     * [SecurityException] when it cannot.
+     * it, such as `Download/Jaitsizazu/clip.mp3`. Throws when it cannot: an
+     * [IOException], a [SecurityException], or whatever MediaStore throws.
      */
     fun publish(file: Path): String
 }
@@ -39,7 +39,8 @@ fun interface MediaPublisher {
 /**
  * [MediaConverter] that converts with [converter] inside the app's cache and
  * then publishes the result with [publisher]: the success path is the public
- * one. The converted file in the cache is removed in every case.
+ * one. The converted file in the cache is removed in every case, so a failure
+ * names no leftover there: the user could not reach it anyway.
  */
 class PublishingConverter(
     private val converter: MediaConverter,
@@ -52,7 +53,8 @@ class PublishingConverter(
         try {
             return when (val result = converter.convert(request, outputPath)) {
                 is MediaResult.Success -> publisher.publishOrFail(Paths.get(result.outputPath))
-                is MediaResult.Failure -> result
+                // Its unfinished file is the cache output, removed below.
+                is MediaResult.Failure -> result.copy(leftover = null)
             }
         } finally {
             ignoringFailure { deleteFile(output) }
@@ -99,13 +101,17 @@ class PublishingDownloader(
     }
 }
 
-/** Publishes [file], or says why it could not. */
+/**
+ * Publishes [file], or says why it could not. Besides I/O and security errors,
+ * MediaStore throws IllegalArgumentException, IllegalStateException and
+ * UnsupportedOperationException, so any error but a cancellation counts.
+ */
 private fun MediaPublisher.publishOrFail(file: Path): MediaResult =
     try {
         MediaResult.Success(publish(file))
-    } catch (e: IOException) {
-        MediaResult.Failure(Problem.CannotSaveInto(PUBLIC_FOLDER, e.message))
-    } catch (e: SecurityException) {
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
         MediaResult.Failure(Problem.CannotSaveInto(PUBLIC_FOLDER, e.message))
     }
 

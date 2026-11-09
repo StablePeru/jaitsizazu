@@ -87,6 +87,15 @@ class DownloaderStateHolder(
         mutableState.update { it.copy(setupWarnings = warnings, preparing = false, setupFailure = failure) }
     }
 
+    /**
+     * Shows [problem] as the result of a download that could not start, for
+     * example because the storage permission was denied. Ignored while busy.
+     */
+    fun showProblem(problem: Problem) {
+        if (isBusy) return
+        mutableState.update { it.copy(status = DownloadStatus.Failed(problem)) }
+    }
+
     fun download() {
         val current = mutableState.value
         if (!current.canDownload) return

@@ -48,8 +48,8 @@ The Android app (Android 8 or later) has the same two tabs. The differences:
 - **Convert:** **Choose file** opens Android's file picker. The app copies the file into its private cache, converts it there and saves the result in `Download/Jaitsizazu`.
 - **Download:** there is no folder to choose. Every file goes to `Download/Jaitsizazu`, and the screen says so.
 - Nothing is ever overwritten: a name that is taken gets a variant, such as `memo (1).wav`.
-- The app needs no storage permission on Android 10 and later. On Android 8 and 9 it asks for the storage permission the first time it saves, because those versions need it to write into `Download`.
-- yt-dlp, Python, ffmpeg and the QuickJS JavaScript runtime (for YouTube) come inside the app, from [youtubedl-android](https://github.com/yausername/youtubedl-android). The first start takes a few seconds to unpack them. Nothing else needs installing.
+- The app needs no storage permission on Android 10 and later. On Android 8 and 9 it asks for the storage permission the first time it saves, because those versions need it to write into `Download`. If you deny it, the app starts nothing and says so.
+- yt-dlp, Python, ffmpeg and the QuickJS JavaScript runtime (for YouTube) come inside the app, from [youtubedl-android](https://github.com/yausername/youtubedl-android). The first start takes a few seconds to unpack them: until then, **Download** and **Update yt-dlp** wait, and the screen says the engine is being prepared. Nothing else needs installing.
 - The yt-dlp inside the app is as old as the app. **Update yt-dlp** downloads the latest stable release from GitHub into the app, without a new version of the app. Do it once after installing.
 - **Limitation:** a download keeps running only while the app is open. If you leave the app, Android may stop it.
 

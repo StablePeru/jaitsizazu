@@ -56,6 +56,12 @@ sealed interface Problem {
     /** Nothing can be saved into [folder]. [detail] is the system's own message, if any. */
     data class CannotSaveInto(val folder: String, val detail: String?) : Problem
 
+    /**
+     * The user denied the permission to save files into [folder] (on Android
+     * 8 and 9, which ask for it), so nothing was started.
+     */
+    data class SavePermissionDenied(val folder: String) : Problem
+
     /** ffmpeg ended with [exitCode]. */
     data class ConversionFailed(val exitCode: Int, val toolOutput: String) : Problem
 

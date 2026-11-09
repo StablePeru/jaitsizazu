@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import jaitsizazu.core.Problem
 import jaitsizazu.ui.AppLanguage
 import jaitsizazu.ui.AppTabs
 import jaitsizazu.ui.ConverterScreen
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     onChooseFile = { pickFile.launch(arrayOf("audio/*", "video/*")) },
                     onFormatSelected = app.converter::selectFormat,
-                    onConvert = { withStorage(app.converter::convert) },
+                    onConvert = { withStorage(app.converter::convert, app.converter::showProblem) },
                     onCancel = app.converter::cancel,
                 )
             },
@@ -84,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     onQualitySelected = app.downloader::selectQuality,
                     // The folder is fixed: Download/Jaitsizazu.
                     onChooseFolder = null,
-                    onDownload = { withStorage(app.downloader::download) },
+                    onDownload = { withStorage(app.downloader::download, app.downloader::showProblem) },
                     onCancel = app.downloader::cancel,
                     onUpdate = app.downloader::updateDownloader,
                 )
@@ -94,24 +95,21 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Runs an action that saves into Download/Jaitsizazu. Android 8 and 9 need
-     * the storage permission for it: there the action waits for the answer, and
-     * runs either way. Without the permission, saving fails and says so.
+     * the storage permission for it: there the action waits for the answer. When
+     * the permission is denied, the action does not run, and `refuse` shows why.
      */
     @Composable
-    private fun rememberStorageAccess(): (() -> Unit) -> Unit {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return { it() }
+    private fun rememberStorageAccess(): (action: () -> Unit, refuse: (Problem) -> Unit) -> Unit {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return { action, _ -> action() }
         // The action that waits for the answer. Kept across recompositions, not across a rotation.
-        val pending = remember { arrayOfNulls<() -> Unit>(1) }
-        val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            pending[0]?.invoke()
-            pending[0] = null
-        }
-        return { action ->
+        val pending = remember { PendingSave() }
+        val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission(), pending::answer)
+        return { action, refuse ->
             val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
             if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
                 action()
             } else {
-                pending[0] = action
+                pending.waitFor(action, refuse)
                 ask.launch(permission)
             }
         }

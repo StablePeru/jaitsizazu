@@ -71,6 +71,7 @@ Every text that Jaitsizazu shows, with its English source and the Basque proposa
 | `problem_file_already_exists` | %1$s already exists. Nothing was overwritten. | Fitxategi hau badago jada: %1$s. Ez da ezer gainidatzi. |
 | `problem_cannot_create_file` | Could not create %1$s. | Ezin izan da fitxategi hau sortu: %1$s |
 | `problem_cannot_save_into` | Cannot save into %1$s. | Ezin da karpeta honetan gorde: %1$s |
+| `problem_save_permission_denied` | Permission to save files in %1$s was denied, so nothing was started. Try again and allow it, or allow storage for Jaitsizazu in the phone settings. | Ukatu egin da fitxategiak hemen gordetzeko baimena: %1$s. Ez da ezer hasi. Saiatu berriro eta onartu, edo eman biltegiratze-baimena Jaitsizazuri telefonoaren ezarpenetan. |
 | `problem_conversion_failed` | The conversion failed (ffmpeg exit code %1$s). | Bihurketak huts egin du (ffmpeg irteera-kodea: %1$s). |
 | `problem_download_failed` | The download failed (yt-dlp exit code %1$s). | Deskargak huts egin du (yt-dlp irteera-kodea: %1$s). |
 | `problem_no_file_reported` | yt-dlp finished, but it reported no file. | yt-dlp amaitu da, baina ez du fitxategirik adierazi. |

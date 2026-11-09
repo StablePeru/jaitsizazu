@@ -182,6 +182,36 @@ class DownloaderStateHolderTest {
     }
 
     @Test
+    fun showsAProblemThatStoppedTheDownloadFromStarting() = runTest {
+        // On Android 8 and 9, when the user denies the storage permission.
+        val denied = Problem.SavePermissionDenied("Download/Jaitsizazu")
+        val downloader = FakeDownloader()
+        val holder = holder(downloader)
+        holder.setUrl(url)
+
+        holder.showProblem(denied)
+        advanceUntilIdle()
+
+        assertEquals(DownloadStatus.Failed(denied), holder.state.value.status)
+        assertTrue(downloader.requests.isEmpty())
+        assertTrue(holder.state.value.canDownload, "the user cannot try again")
+    }
+
+    @Test
+    fun ignoresAProblemShownWhileDownloading() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val holder = holder(FakeDownloader(gate))
+        holder.setUrl(url)
+        holder.download()
+
+        holder.showProblem(Problem.SavePermissionDenied("Download/Jaitsizazu"))
+        assertTrue(holder.state.value.status is DownloadStatus.Downloading)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(DownloadStatus.Done("$downloads/clip.mp3"), holder.state.value.status)
+    }
+
+    @Test
     fun isReadyAtOnceWhenThereIsNoSetupToWaitFor() = runTest {
         // The desktop app: its tools are looked up on every download.
         val holder = holder()

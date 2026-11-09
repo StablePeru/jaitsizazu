@@ -104,6 +104,43 @@ class PublishingTest {
     }
 
     @Test
+    fun dropsTheLeftoverOfAFailedConversionWithTheCacheOutput() = runTest {
+        // The user cannot reach the app's cache, so pointing at the file there would not help.
+        val fails = converter { outputPath ->
+            Path.of(outputPath).writeText("half")
+            MediaResult.Failure(Problem.ConversionFailed(1, "Invalid data"), Leftover.UnfinishedFile(outputPath, "busy"))
+        }
+
+        val result = PublishingConverter(fails, FakePublisher()).convert(conversion, output.toString())
+
+        assertEquals(MediaResult.Failure(Problem.ConversionFailed(1, "Invalid data")), result)
+        assertFalse(output.exists())
+    }
+
+    @Test
+    fun saysWhenMediaStoreRejectsTheConvertedFile() = runTest {
+        // MediaStore throws more than I/O and security errors, for example when it finds no free name.
+        for (rejection in listOf(
+            IllegalStateException("Failed to build unique file"),
+            IllegalArgumentException("Invalid column"),
+            UnsupportedOperationException("Unknown URI"),
+        )) {
+            val result = PublishingConverter(converts, FakePublisher(rejection)).convert(conversion, output.toString())
+
+            assertEquals(MediaResult.Failure(Problem.CannotSaveInto(PUBLIC_FOLDER, rejection.message)), result)
+            assertFalse(output.exists())
+        }
+    }
+
+    @Test
+    fun passesACancellationWhilePublishingOn() = runTest {
+        assertFailsWith<CancellationException> {
+            PublishingConverter(converts, FakePublisher(CancellationException("cancelled"))).convert(conversion, output.toString())
+        }
+        assertFalse(output.exists())
+    }
+
+    @Test
     fun removesTheCacheOutputWhenTheConversionIsCancelled() = runTest {
         val cancelled = converter { outputPath ->
             Path.of(outputPath).writeText("half")
@@ -183,6 +220,11 @@ class PublishingTest {
     fun saysWhenTheDownloadCannotBePublishedOrHasNoJobFolder() = runTest {
         val notPublished = downloader(FakePublisher(SecurityException("denied")), savesTheClip).download(request) {}
         assertEquals(MediaResult.Failure(Problem.CannotSaveInto(PUBLIC_FOLDER, "denied")), notPublished)
+
+        val rejected = downloader(FakePublisher(IllegalStateException("Failed to build unique file")), savesTheClip)
+            .download(request) {}
+        assertEquals(MediaResult.Failure(Problem.CannotSaveInto(PUBLIC_FOLDER, "Failed to build unique file")), rejected)
+        assertEquals(emptyList(), jobs.listDirectoryEntries())
 
         val noFolder = PublishingDownloader(
             downloader(FakePublisher()) { error("must not run") },

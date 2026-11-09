@@ -78,6 +78,7 @@
     <string name="problem_file_already_exists">%1$s already exists. Nothing was overwritten.</string>
     <string name="problem_cannot_create_file">Could not create %1$s.</string>
     <string name="problem_cannot_save_into">Cannot save into %1$s.</string>
+    <string name="problem_save_permission_denied">Permission to save files in %1$s was denied, so nothing was started. Try again and allow it, or allow storage for Jaitsizazu in the phone settings.</string>
     <string name="problem_conversion_failed">The conversion failed (ffmpeg exit code %1$s).</string>
     <string name="problem_download_failed">The download failed (yt-dlp exit code %1$s).</string>
     <string name="problem_no_file_reported">yt-dlp finished, but it reported no file.</string>

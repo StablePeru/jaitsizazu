@@ -53,6 +53,15 @@ class ConverterStateHolder(
         mutableState.update { it.copy(setupWarnings = problems) }
     }
 
+    /**
+     * Shows [problem] as the result of a conversion that could not start, for
+     * example because the storage permission was denied. Ignored while converting.
+     */
+    fun showProblem(problem: Problem) {
+        if (isConverting) return
+        mutableState.update { it.copy(status = ConversionStatus.Failed(problem)) }
+    }
+
     fun convert() {
         val current = mutableState.value
         val file = current.selectedFile

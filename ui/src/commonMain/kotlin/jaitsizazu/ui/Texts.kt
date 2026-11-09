@@ -24,6 +24,7 @@ import jaitsizazu.ui.resources.problem_no_free_name
 import jaitsizazu.ui.resources.problem_no_web_address
 import jaitsizazu.ui.resources.problem_not_a_file
 import jaitsizazu.ui.resources.problem_not_a_web_address
+import jaitsizazu.ui.resources.problem_save_permission_denied
 import jaitsizazu.ui.resources.problem_tool_did_not_start
 import jaitsizazu.ui.resources.problem_tool_not_at_configured_path
 import jaitsizazu.ui.resources.problem_tool_not_found
@@ -86,6 +87,7 @@ internal fun problemText(problem: Problem): String = when (problem) {
         stringResource(Res.string.problem_cannot_create_file, problem.path).withRawLines(problem.detail)
     is Problem.CannotSaveInto ->
         stringResource(Res.string.problem_cannot_save_into, problem.folder).withRawLines(problem.detail)
+    is Problem.SavePermissionDenied -> stringResource(Res.string.problem_save_permission_denied, problem.folder)
     is Problem.ConversionFailed ->
         stringResource(Res.string.problem_conversion_failed, problem.exitCode).withRawLines(problem.toolOutput)
     is Problem.DownloadFailed ->
