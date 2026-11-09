@@ -30,7 +30,6 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.deleteRecursively
 
@@ -56,13 +55,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val converter = ConverterStateHolder(
         ConvertMedia(
             PublishingConverter(
-                FfmpegConverter(
-                    runtime::locateFfmpeg,
-                    runner,
-                    // Paths.get: Android only has Path.of from API level 34.
-                    claimFile = { Files.createFile(Paths.get(it)) },
-                    deleteFile = { Files.deleteIfExists(Paths.get(it)) },
-                ),
+                FfmpegConverter(runtime::locateFfmpeg, runner),
                 publisher,
             ),
         ) { File(it).exists() },

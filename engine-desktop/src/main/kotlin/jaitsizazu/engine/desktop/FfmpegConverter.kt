@@ -10,7 +10,7 @@ import java.io.IOException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
-import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * Desktop adapter for [MediaConverter]: runs ffmpeg as a subprocess.
@@ -33,8 +33,9 @@ import java.nio.file.Path
 class FfmpegConverter(
     private val locateFfmpeg: () -> ToolLookup,
     private val runner: ProcessRunner,
-    private val claimFile: (String) -> Unit = { Files.createFile(Path.of(it)) },
-    private val deleteFile: (String) -> Unit = { Files.deleteIfExists(Path.of(it)) },
+    // Paths.get, not Path.of: Android only has Path.of from API level 34.
+    private val claimFile: (String) -> Unit = { Files.createFile(Paths.get(it)) },
+    private val deleteFile: (String) -> Unit = { Files.deleteIfExists(Paths.get(it)) },
 ) : MediaConverter {
 
     override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
