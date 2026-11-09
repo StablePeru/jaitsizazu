@@ -4,6 +4,14 @@ kotlin = "2.4.21"
 # The latest Compose Multiplatform is compatible with the latest Kotlin.
 compose-multiplatform = "1.12.2"
 kotlinx-coroutines = "1.11.0"
+# Android Gradle Plugin: Kotlin 2.4.21 is tested with AGP 8.13-9.3, and AGP 9.3 needs Gradle 9.5 or newer.
+# AGP 9 compiles Kotlin itself, so no module applies org.jetbrains.kotlin.android.
+agp = "9.3.3"
+androidx-activity = "1.13.0"
+# yt-dlp, Python, ffmpeg and QuickJS for Android, as Seal and YTDLnis use them. GPL-3.0.
+# engine-android mirrors how this exact version runs yt-dlp: recheck
+# YoutubeDlAndroidRuntime whenever it changes.
+youtubedl-android = "0.18.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -17,6 +25,10 @@ compose-material = { module = "org.jetbrains.compose.material:material", version
 # Translated strings (Res.string.*), and the tests that read the rendered screens.
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
 compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+youtubedl-android-library = { module = "io.github.junkfood02.youtubedl-android:library", version.ref = "youtubedl-android" }
+youtubedl-android-ffmpeg = { module = "io.github.junkfood02.youtubedl-android:ffmpeg", version.ref = "youtubedl-android" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -24,3 +36,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 # The Compose compiler plugin must use the same version as Kotlin.
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+# Android target for a Kotlin Multiplatform library (core, ui).
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

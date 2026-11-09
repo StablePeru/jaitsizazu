@@ -1,5 +1,6 @@
-# Build image: JDK 21, ffmpeg and yt-dlp. Gradle itself comes from the wrapper,
-# and its downloads live in the ~/.gradle volume declared in compose.yaml.
+# Build image: JDK 21, ffmpeg, yt-dlp and the Android SDK. Gradle itself comes
+# from the wrapper, and its downloads live in the ~/.gradle volume declared in
+# compose.yaml.
 FROM eclipse-temurin:21.0.13_9-jdk-noble
 
 # ffmpeg from Ubuntu: the engine-desktop integration tests run it for real.
@@ -32,5 +33,29 @@ RUN userdel --remove ubuntu 2>/dev/null || true \
     && mkdir -p /home/builder/.gradle /workspace \
     && chown builder:builder /home/builder/.gradle /workspace
 
+# Android SDK for :androidApp, :engine-android and the Android targets of :core
+# and :ui. The command-line tools are pinned and checked against their SHA-256
+# (from dl.google.com/android/repository/repository2-3.xml). The SDK belongs to
+# builder, so the build can read it and install nothing else as root.
+# compileSdk 37 (androidx.compose.ui 1.12 needs it) and the build tools that
+# AGP 9.3 uses by default.
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH="${PATH}:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools"
+ARG ANDROID_CMDLINE_TOOLS=commandlinetools-linux-15859902_latest.zip
+ARG ANDROID_CMDLINE_TOOLS_SHA256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
+RUN mkdir -p "${ANDROID_HOME}" && chown builder:builder "${ANDROID_HOME}"
+
 USER builder
+RUN cd /tmp \
+    && curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
+        --output cmdline-tools.zip \
+        "https://dl.google.com/android/repository/${ANDROID_CMDLINE_TOOLS}" \
+    && echo "${ANDROID_CMDLINE_TOOLS_SHA256}  cmdline-tools.zip" | sha256sum --check --strict \
+    && unzip -q cmdline-tools.zip -d cmdline-tools-unpacked \
+    && mkdir -p "${ANDROID_HOME}/cmdline-tools" \
+    && mv cmdline-tools-unpacked/cmdline-tools "${ANDROID_HOME}/cmdline-tools/latest" \
+    && rm -rf cmdline-tools.zip cmdline-tools-unpacked \
+    && yes | sdkmanager --licenses > /dev/null \
+    && sdkmanager --install "platforms;android-37.0" "build-tools;36.0.0" "platform-tools" > /dev/null
+
 WORKDIR /workspace

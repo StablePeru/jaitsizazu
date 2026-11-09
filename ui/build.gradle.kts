@@ -1,10 +1,11 @@
 // Shared Compose UI: plain state holders plus stateless screens, and every
 // user-facing text as Compose resources: Basque in values/ (the default) and
 // English in values-en/.
-// Only the JVM (desktop) target for now. The Android target is added here
-// later without moving code, since everything lives in commonMain.
+// The JVM (desktop) and Android targets share everything in commonMain. Its
+// tests run on the JVM.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.compose.compiler)
     // Generates the Res class from src/commonMain/composeResources.
     alias(libs.plugins.compose.multiplatform)
@@ -14,6 +15,17 @@ kotlin {
     jvmToolchain(21)
 
     jvm()
+
+    android {
+        namespace = "io.github.stableperu.jaitsizazu.ui"
+        compileSdk = 37
+        minSdk = 26
+        // Packs the Compose resources (the texts) into the Android library.
+        // Without it, Res.string is missing at run time on Android.
+        androidResources {
+            enable = true
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
