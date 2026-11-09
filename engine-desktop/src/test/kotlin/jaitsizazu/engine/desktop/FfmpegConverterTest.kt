@@ -6,8 +6,11 @@ import jaitsizazu.core.MediaResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
+import java.nio.file.AccessDeniedException
+import java.nio.file.FileAlreadyExistsException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -26,16 +29,41 @@ class FfmpegConverterTest {
 
     private val found = { FfmpegLookup.Found("/usr/bin/ffmpeg") }
     private val request = ConversionRequest("/voice/memo.ogg", AudioFormat.WAV)
+    private val claimed = mutableListOf<String>()
     private val deleted = mutableListOf<String>()
 
-    private fun converter(runner: ProcessRunner) =
-        FfmpegConverter(found, runner, fileExists = { false }, deleteFile = { deleted += it })
+    private val hanging = object : ProcessRunner {
+        override suspend fun run(command: List<String>): ProcessOutcome = awaitCancellation()
+    }
+
+    private fun converter(
+        runner: ProcessRunner,
+        claimFile: (String) -> Unit = { claimed += it },
+        deleteFile: (String) -> Unit = { deleted += it },
+    ) = FfmpegConverter(found, runner, claimFile = claimFile, deleteFile = deleteFile)
+
+    /** Starts a conversion with [converter], cancels it and returns what its caller caught. */
+    private suspend fun TestScope.cancelledConversion(converter: FfmpegConverter): Throwable? {
+        var thrown: Throwable? = null
+        val job = launch {
+            try {
+                converter.convert(request, "/voice/memo.wav")
+            } catch (e: CancellationException) {
+                thrown = e
+                throw e
+            }
+        }
+        testScheduler.advanceUntilIdle()
+        job.cancel()
+        job.join()
+        return thrown
+    }
 
     @Test
     fun runsFfmpegWithTheBuiltArguments() = runTest {
         val runner = FakeRunner { ProcessOutcome(0, "") }
 
-        val result = FfmpegConverter(found, runner).convert(request, "/voice/memo.wav")
+        val result = converter(runner).convert(request, "/voice/memo.wav")
 
         assertEquals(MediaResult.Success("/voice/memo.wav"), result)
         assertEquals(
@@ -45,10 +73,25 @@ class FfmpegConverterTest {
     }
 
     @Test
+    fun claimsTheOutputBeforeRunningFfmpeg() = runTest {
+        val events = mutableListOf<String>()
+        val runner = object : ProcessRunner {
+            override suspend fun run(command: List<String>): ProcessOutcome {
+                events += "run"
+                return ProcessOutcome(0, "")
+            }
+        }
+
+        converter(runner, claimFile = { events += "claim $it" }).convert(request, "/voice/memo.wav")
+
+        assertEquals(listOf("claim /voice/memo.wav", "run"), events)
+    }
+
+    @Test
     fun mapsANonZeroExitToAFailureWithTheStderrTail() = runTest {
         val runner = FakeRunner { ProcessOutcome(1, "memo.ogg: Invalid data found when processing input") }
 
-        val result = FfmpegConverter(found, runner).convert(request, "/voice/memo.wav")
+        val result = converter(runner).convert(request, "/voice/memo.wav")
 
         assertIs<MediaResult.Failure>(result)
         assertTrue("exit code 1" in result.reason, result.reason)
@@ -56,47 +99,52 @@ class FfmpegConverterTest {
     }
 
     @Test
-    fun reportsAMissingFfmpegWithoutRunningAnything() = runTest {
+    fun reportsAMissingFfmpegWithoutClaimingOrRunningAnything() = runTest {
         val runner = FakeRunner { error("must not run") }
         val missing = { FfmpegLookup.NotFound("ffmpeg was not found.") }
 
-        val result = FfmpegConverter(missing, runner).convert(request, "/voice/memo.wav")
+        val result = FfmpegConverter(missing, runner, claimFile = { claimed += it }).convert(request, "/voice/memo.wav")
 
         assertEquals(MediaResult.Failure("ffmpeg was not found."), result)
         assertTrue(runner.commands.isEmpty())
+        assertTrue(claimed.isEmpty())
     }
 
     @Test
-    fun refusesAnOutputThatAlreadyExistsWithoutRunningAnything() = runTest {
+    fun refusesAnOutputThatAlreadyExistsWithoutRunningOrDeletingAnything() = runTest {
         val runner = FakeRunner { error("must not run") }
 
-        val result = FfmpegConverter(found, runner, fileExists = { true }).convert(request, "/voice/memo.wav")
+        val result = converter(runner, claimFile = { throw FileAlreadyExistsException(it) })
+            .convert(request, "/voice/memo.wav")
 
-        assertIs<MediaResult.Failure>(result)
-        assertTrue("already exists" in result.reason, result.reason)
+        assertEquals(MediaResult.Failure("/voice/memo.wav already exists. Nothing was overwritten."), result)
         assertTrue(runner.commands.isEmpty())
+        assertTrue(deleted.isEmpty(), "a file that was already there is not ours to delete")
     }
 
     @Test
-    fun treatsFfmpegRefusingToOverwriteAsAFailureEvenWithExitCodeZero() = runTest {
-        // ffmpeg 6.1 with -n exits with 0 when the output appeared in the meantime.
-        val runner = FakeRunner { ProcessOutcome(0, "File '/voice/memo.wav' already exists. Exiting.") }
+    fun reportsAnOutputThatCannotBeCreatedWithoutRunningOrDeletingAnything() = runTest {
+        val runner = FakeRunner { error("must not run") }
 
-        val result = FfmpegConverter(found, runner).convert(request, "/voice/memo.wav")
+        val result = converter(runner, claimFile = { throw AccessDeniedException(it) })
+            .convert(request, "/voice/memo.wav")
 
         assertIs<MediaResult.Failure>(result)
-        assertTrue("already exists" in result.reason, result.reason)
+        assertTrue("Could not create /voice/memo.wav" in result.reason, result.reason)
+        assertTrue(runner.commands.isEmpty())
+        assertTrue(deleted.isEmpty())
     }
 
     @Test
-    fun reportsAProcessThatCannotStart() = runTest {
+    fun reportsAProcessThatCannotStartAndRemovesTheClaimedOutput() = runTest {
         val runner = FakeRunner { throw IOException("error=13, Permission denied") }
 
-        val result = FfmpegConverter(found, runner).convert(request, "/voice/memo.wav")
+        val result = converter(runner).convert(request, "/voice/memo.wav")
 
         assertIs<MediaResult.Failure>(result)
         assertTrue("Could not start ffmpeg" in result.reason, result.reason)
         assertTrue("Permission denied" in result.reason, result.reason)
+        assertEquals(listOf("/voice/memo.wav"), deleted)
     }
 
     @Test
@@ -118,55 +166,31 @@ class FfmpegConverterTest {
     }
 
     @Test
-    fun neverDeletesAFileThatFfmpegRefusedToOverwrite() = runTest {
-        // That file belongs to someone else: it appeared before ffmpeg started.
-        for (exitCode in listOf(0, 1)) {
-            val runner = FakeRunner { ProcessOutcome(exitCode, "File '/voice/memo.wav' already exists. Exiting.") }
-
-            assertIs<MediaResult.Failure>(converter(runner).convert(request, "/voice/memo.wav"))
-        }
-        assertTrue(deleted.isEmpty())
-    }
-
-    @Test
-    fun deletesNothingWhenFfmpegCannotStart() = runTest {
-        val runner = FakeRunner { throw IOException("error=2, No such file or directory") }
-
-        assertIs<MediaResult.Failure>(converter(runner).convert(request, "/voice/memo.wav"))
-        assertTrue(deleted.isEmpty())
-    }
-
-    @Test
     fun deletesThePartialOutputAndRethrowsWhenCancelled() = runTest {
-        val hanging = object : ProcessRunner {
-            override suspend fun run(command: List<String>): ProcessOutcome = awaitCancellation()
-        }
-        var thrown: Throwable? = null
-        val job = launch {
-            try {
-                converter(hanging).convert(request, "/voice/memo.wav")
-            } catch (e: CancellationException) {
-                thrown = e
-                throw e
-            }
-        }
-        testScheduler.advanceUntilIdle()
-
-        job.cancel()
-        job.join()
+        val thrown = cancelledConversion(converter(hanging))
 
         assertIs<CancellationException>(thrown)
         assertEquals(listOf("/voice/memo.wav"), deleted)
     }
 
     @Test
-    fun aFailedDeleteDoesNotHideTheConversionFailure() = runTest {
-        val runner = FakeRunner { ProcessOutcome(1, "Error while decoding stream") }
-        val converter = FfmpegConverter(found, runner, fileExists = { false }, deleteFile = { throw IOException("busy") })
+    fun aFailedDeleteIsAttachedToTheCancellation() = runTest {
+        val thrown = cancelledConversion(converter(hanging, deleteFile = { throw IOException("busy") }))
 
-        val result = converter.convert(request, "/voice/memo.wav")
+        assertIs<CancellationException>(thrown)
+        val suppressed = thrown.suppressed.single()
+        assertIs<IOException>(suppressed)
+        assertEquals("busy", suppressed.message)
+    }
+
+    @Test
+    fun aFailedDeleteIsReportedWithoutHidingTheConversionFailure() = runTest {
+        val runner = FakeRunner { ProcessOutcome(1, "Error while decoding stream") }
+
+        val result = converter(runner, deleteFile = { throw IOException("busy") }).convert(request, "/voice/memo.wav")
 
         assertIs<MediaResult.Failure>(result)
         assertTrue("exit code 1" in result.reason, result.reason)
+        assertTrue("/voice/memo.wav could not be removed: busy" in result.reason, result.reason)
     }
 }

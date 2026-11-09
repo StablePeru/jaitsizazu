@@ -12,6 +12,7 @@ import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.test.AfterTest
@@ -26,7 +27,7 @@ import kotlin.test.fail
 /**
  * Runs the real ffmpeg. The Docker build image installs it, so this runs in
  * `./gradlew check`. Without ffmpeg on the machine, these tests fail on purpose.
- * The cancellation test also needs `mkfifo`, so it expects a POSIX system.
+ * The cancellation test also needs `mkfifo` and `/proc`, so it expects Linux.
  */
 class FfmpegIntegrationTest {
 
@@ -64,6 +65,23 @@ class FfmpegIntegrationTest {
 
     private fun convertFile(input: File, format: AudioFormat, output: File): MediaResult = runBlocking {
         converter.convert(ConversionRequest(input.path, format), output.path)
+    }
+
+    private fun ffmpegChildren(): List<ProcessHandle> =
+        ProcessHandle.current().children()
+            .filter { it.isAlive && "ffmpeg" in it.info().command().orElse("") }
+            .toList()
+
+    private fun runningFfmpegChildren(): List<String> = ffmpegChildren().map { it.info().command().orElse("") }
+
+    /** Whether a running ffmpeg child holds [file] open. Reads /proc, so it needs Linux. */
+    private fun ffmpegHasOpen(file: File): Boolean {
+        if (!file.exists()) return false
+        val target = file.toPath().toRealPath()
+        return ffmpegChildren().any { child ->
+            val fds = File("/proc/${child.pid()}/fd").listFiles().orEmpty()
+            fds.any { fd -> runCatching { Files.readSymbolicLink(fd.toPath()) == target }.getOrDefault(false) }
+        }
     }
 
     private fun File.startsWith(magic: String) =
@@ -104,15 +122,14 @@ class FfmpegIntegrationTest {
     }
 
     @Test
-    fun ffmpegItselfRefusesToOverwriteWhenTheCheckMissesTheFile() = runBlocking {
-        // Simulates a file that appears between the check and the conversion.
-        val blind = FfmpegConverter({ ffmpeg }, SystemProcessRunner(), fileExists = { false })
-        val taken = File(dir, "voice.wav").apply { writeText("keep me") }
+    fun aFailedConversionLeavesNoOutputBehind() {
+        val notAudio = File(dir, "notes.ogg").apply { writeText("not audio at all") }
+        val output = File(dir, "notes.wav")
 
-        val result = blind.convert(ConversionRequest(voiceNote.path, AudioFormat.WAV), taken.path)
+        val result = convertFile(notAudio, AudioFormat.WAV, output)
 
         assertIs<MediaResult.Failure>(result)
-        assertEquals("keep me", taken.readText())
+        assertFalse(output.exists(), "the claimed output was left behind")
     }
 
     @Test
@@ -142,13 +159,21 @@ class FfmpegIntegrationTest {
             }
         }
         val output = File(dir, "stuck.wav")
+        // ffmpeg processes still running when the partial output is deleted.
+        var aliveAtDelete: List<String>? = null
+        val watched = FfmpegConverter({ ffmpeg }, SystemProcessRunner(), deleteFile = {
+            aliveAtDelete = runningFfmpegChildren()
+            Files.deleteIfExists(Path.of(it))
+        })
 
         try {
-            val job = launch { converter.convert(ConversionRequest(fifo.path, AudioFormat.WAV), output.path) }
-            withTimeout(30_000) { while (!output.exists()) delay(50) }
+            val job = launch { watched.convert(ConversionRequest(fifo.path, AudioFormat.WAV), output.path) }
+            // The claimed file exists from the start; wait until ffmpeg has opened it.
+            withTimeout(30_000) { while (!ffmpegHasOpen(output)) delay(50) }
 
             withTimeout(30_000) { job.cancelAndJoin() }
 
+            assertEquals(emptyList(), aliveAtDelete, "ffmpeg was still running when its output was deleted")
             assertFalse(output.exists(), "the partial output was left behind")
         } finally {
             release.countDown()

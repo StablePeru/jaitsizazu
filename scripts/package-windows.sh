@@ -6,7 +6,7 @@
 #
 # Run it inside the build container, never on the host:
 #
-#   docker compose run --rm build scripts/package-windows.sh
+#   docker compose run --rm build bash scripts/package-windows.sh
 #
 # Downloads are cached in build/windows-downloads/ and checked against the
 # pinned SHA-256 and the publisher's checksum file on every run.
@@ -25,7 +25,6 @@ TEMURIN_SHA256="2332c0b4cff6bed722da3567c91d5e47568bcba863fa4945d0a8d6fc76158628
 FFMPEG_TAG="autobuild-2026-10-31-12-59"
 FFMPEG_ASSET="ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip"
 FFMPEG_SHA256="693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9"
-FFMPEG_COMMIT="7adfbe40dc"
 
 # ---------------------------------------------------------------------------
 
@@ -44,6 +43,11 @@ fail() {
     echo "ERROR: $*" >&2
     exit 1
 }
+
+# The FFmpeg commit is the hash after "-g" in the asset name, so it has one source.
+[[ "$FFMPEG_ASSET" =~ -g([0-9a-f]{7,40})- ]] \
+    || fail "Cannot read the FFmpeg commit from $FFMPEG_ASSET (expected -g<hash>-)."
+FFMPEG_COMMIT="${BASH_REMATCH[1]}"
 
 # Downloads $1/$2 into the cache unless it is there, then checks it against
 # the pinned hash $3 and against the publisher's checksum file $4.

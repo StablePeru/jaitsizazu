@@ -1,17 +1,110 @@
 package jaitsizazu.engine.desktop
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Runs the current `java` binary as a child process, so it works on any OS. */
 class SystemProcessRunnerTest {
+
+    /**
+     * A process that needs [dieAfterMillis] to exit once it is killed, like a
+     * Windows process that still holds its files open for a moment. Its pipes
+     * close as soon as it is killed.
+     */
+    private class SlowToDieProcess(private val dieAfterMillis: Long) : Process() {
+        private val killed = CountDownLatch(1)
+        private val exited = CountDownLatch(1)
+
+        @Volatile
+        var waiting = false
+            private set
+
+        private val pipe = object : InputStream() {
+            override fun read(): Int {
+                killed.await()
+                return -1
+            }
+        }
+
+        override fun getOutputStream(): OutputStream = OutputStream.nullOutputStream()
+        override fun getInputStream(): InputStream = pipe
+        override fun getErrorStream(): InputStream = pipe
+
+        override fun waitFor(): Int {
+            waiting = true
+            exited.await()
+            return KILLED
+        }
+
+        override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = exited.await(timeout, unit)
+
+        override fun exitValue(): Int =
+            if (isAlive) throw IllegalThreadStateException("still running") else KILLED
+
+        override fun isAlive(): Boolean = exited.count > 0
+
+        override fun destroy() {
+            destroyForcibly()
+        }
+
+        override fun destroyForcibly(): Process {
+            if (killed.count > 0) {
+                killed.countDown()
+                thread(isDaemon = true) {
+                    Thread.sleep(dieAfterMillis)
+                    exited.countDown()
+                }
+            }
+            return this
+        }
+
+        companion object {
+            const val KILLED = 137
+        }
+    }
+
+    private suspend fun cancelWhileWaiting(process: SlowToDieProcess, runner: SystemProcessRunner) =
+        withTimeout(30_000) {
+            val job = launch(Dispatchers.Default) { runner.run(listOf("ignored")) }
+            while (!process.waiting) delay(10)
+            job.cancelAndJoin()
+        }
+
+    @Test
+    fun waitsForAKilledProcessToExitBeforeTheCancellationGoesOn() = runBlocking {
+        val process = SlowToDieProcess(dieAfterMillis = 300)
+
+        cancelWhileWaiting(process, SystemProcessRunner(startProcess = { process }))
+
+        assertFalse(process.isAlive, "the cancellation went on while the killed process was still running")
+    }
+
+    @Test
+    fun waitsForAKilledProcessOnlyForABoundedTime() = runBlocking {
+        val process = SlowToDieProcess(dieAfterMillis = 60_000)
+        val runner = SystemProcessRunner(startProcess = { process }, exitTimeout = 200.milliseconds)
+
+        cancelWhileWaiting(process, runner)
+
+        assertTrue(process.isAlive)
+    }
 
     private val java = ProcessHandle.current().info().command().orElseThrow()
 

@@ -87,6 +87,8 @@ The result is `dist/jaitsizazu-windows-x64/` and `dist/jaitsizazu-windows-x64.zi
 | `bin/ffmpeg.exe` | FFmpeg GPL static build for Windows x64. |
 | `THIRD-PARTY.txt`, `licenses/` | Third-party versions, sources and licenses. |
 
+If the window does not appear, look in `%LOCALAPPDATA%\Jaitsizazu\`: `launch.log` holds the Java output of the last launch, and `crash.log` the errors the app could not handle.
+
 The script pins the Temurin and FFmpeg versions at its top, downloads them over HTTPS and stops if a SHA-256 does not match the pinned value or the publisher's checksum file. `-Pjaitsizazu.desktopTarget=windows-x64` is what makes Gradle use the Windows Skiko runtime from the Linux container.
 
 ## Architecture

@@ -20,7 +20,7 @@ class FfmpegArgumentsTest {
     fun buildsTheFullListForWav() {
         assertEquals(
             listOf(
-                "-hide_banner", "-nostdin", "-loglevel", "error", "-n",
+                "-hide_banner", "-nostdin", "-loglevel", "error", "-y",
                 "-protocol_whitelist", "file", "-i", "in.ogg", "-vn", "-c:a", "pcm_s16le", "out.x",
             ),
             argsFor(AudioFormat.WAV),
@@ -36,11 +36,12 @@ class FfmpegArgumentsTest {
     }
 
     @Test
-    fun neverOverwritesAndDropsVideoForEveryFormat() {
+    fun writesIntoTheClaimedOutputAndDropsVideoForEveryFormat() {
+        // The caller claims the output first, so ffmpeg must write into that empty file.
         for (format in AudioFormat.entries) {
             val args = argsFor(format)
-            assertTrue("-n" in args, "$format: -n missing")
-            assertFalse("-y" in args, "$format: -y present")
+            assertTrue("-y" in args, "$format: -y missing")
+            assertFalse("-n" in args, "$format: -n present")
             assertTrue("-vn" in args, "$format: -vn missing")
             assertTrue("-nostdin" in args, "$format: -nostdin missing")
         }

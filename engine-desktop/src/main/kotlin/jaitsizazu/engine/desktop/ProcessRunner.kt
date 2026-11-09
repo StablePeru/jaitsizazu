@@ -9,6 +9,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** How a finished process ended. [stderrTail] holds its last stderr lines. */
 data class ProcessOutcome(val exitCode: Int, val stderrTail: String)
@@ -23,15 +26,21 @@ interface ProcessRunner {
  * [ProcessRunner] on [ProcessBuilder]. It runs on [dispatcher], off the main thread,
  * and reads stdout and stderr to the end so a chatty process cannot block on a
  * full pipe. Only the last [maxStderrLines] stderr lines are kept.
- * Cancelling the coroutine kills the process.
+ *
+ * Cancelling the coroutine kills the process and waits up to [exitTimeout] for
+ * it to exit before the cancellation goes on. On Windows a running process
+ * keeps its output file locked, so the caller can only remove that file once
+ * the process is gone. [startProcess] starts the process; tests replace it.
  */
 class SystemProcessRunner(
     private val maxStderrLines: Int = 20,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val exitTimeout: Duration = 5.seconds,
+    private val startProcess: (List<String>) -> Process = { ProcessBuilder(it).start() },
 ) : ProcessRunner {
 
     override suspend fun run(command: List<String>): ProcessOutcome = withContext(dispatcher) {
-        val process = ProcessBuilder(command).start()
+        val process = startProcess(command)
         process.outputStream.close()
         try {
             coroutineScope {
@@ -42,13 +51,28 @@ class SystemProcessRunner(
                 } catch (e: CancellationException) {
                     // Killing the process closes its pipes, so the readers above
                     // finish and this scope can complete.
-                    process.destroyForcibly()
+                    killAndAwaitExit(process)
                     throw e
                 }
                 ProcessOutcome(exitCode, tail.await())
             }
         } finally {
-            if (process.isAlive) process.destroyForcibly()
+            killAndAwaitExit(process)
+        }
+    }
+
+    /**
+     * Kills [process] if it still runs and blocks until it exits, for
+     * [exitTimeout] at most. It does not suspend, so a cancelled coroutine
+     * still waits here.
+     */
+    private fun killAndAwaitExit(process: Process) {
+        if (!process.isAlive) return
+        process.destroyForcibly()
+        try {
+            process.waitFor(exitTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
     }
 
