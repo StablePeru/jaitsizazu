@@ -1,0 +1,12 @@
+# Normalise text files and keep Unix scripts runnable inside Linux
+# containers, even from a Windows checkout with core.autocrlf=true.
+* text=auto
+
+gradlew text eol=lf
+*.sh text eol=lf
+*.kts text eol=lf
+Dockerfile text eol=lf
+
+*.bat text eol=crlf
+
+*.jar binary

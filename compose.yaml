@@ -1,0 +1,15 @@
+# Usage: docker compose run --rm build ./gradlew check
+services:
+  build:
+    build: .
+    image: jaitsizazu-build:local
+    working_dir: /workspace
+    environment:
+      # Each run is a fresh container, so a background daemon would be wasted.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+    volumes:
+      - .:/workspace
+      - gradle-home:/home/builder/.gradle
+
+volumes:
+  gradle-home:

@@ -1,0 +1,14 @@
+[versions]
+# Kotlin 2.4.20-2.4.21 supports Gradle 7.6.3-9.7.0 (kotlinlang.org multiplatform compatibility guide).
+kotlin = "2.4.21"
+# The latest Compose Multiplatform is compatible with the latest Kotlin.
+compose-multiplatform = "1.12.2"
+
+[libraries]
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+# The Compose compiler plugin must use the same version as Kotlin.
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
