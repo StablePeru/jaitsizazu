@@ -10,10 +10,13 @@ object FfmpegArguments {
      *
      * Video streams (such as cover art) are dropped. `-n` makes ffmpeg fail
      * instead of overwriting [outputPath]; the caller picks a free name first.
+     * `-protocol_whitelist file` lets the input read local files only, also when
+     * it is a playlist (HLS, concat) that points at other files or at URLs:
+     * a crafted input cannot make ffmpeg reach the network.
      */
     fun build(inputPath: String, outputPath: String, format: AudioFormat): List<String> =
         listOf("-hide_banner", "-nostdin", "-loglevel", "error", "-n") +
-            listOf("-i", inputPath, "-vn") +
+            listOf("-protocol_whitelist", "file", "-i", inputPath, "-vn") +
             codecArguments(format) +
             outputPath
 

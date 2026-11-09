@@ -28,6 +28,7 @@ import jaitsizazu.core.fileNameOf
 /**
  * The converter screen. Stateless: it shows [state] and reports clicks
  * through the callbacks. The caller owns the state and the file chooser.
+ * While a conversion runs, a Cancel button reports [onCancel].
  */
 @Composable
 fun ConverterScreen(
@@ -35,6 +36,7 @@ fun ConverterScreen(
     onChooseFile: () -> Unit,
     onFormatSelected: (AudioFormat) -> Unit,
     onConvert: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val idle = state.status != ConversionStatus.Converting
@@ -44,8 +46,8 @@ fun ConverterScreen(
     ) {
         Text("Convert an audio file", style = MaterialTheme.typography.h5)
 
-        state.setupProblem?.let { problem ->
-            SelectionContainer { Text(problem, color = MaterialTheme.colors.error) }
+        state.setupWarning?.let { warning ->
+            SelectionContainer { Text(warning, color = MaterialTheme.colors.error) }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -60,7 +62,10 @@ fun ConverterScreen(
         Text("Convert to", style = MaterialTheme.typography.subtitle1)
         FormatChoice(selected = state.format, enabled = idle, onSelected = onFormatSelected)
 
-        Button(onClick = onConvert, enabled = state.canConvert) { Text("Convert") }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = onConvert, enabled = state.canConvert) { Text("Convert") }
+            if (!idle) OutlinedButton(onClick = onCancel) { Text("Cancel") }
+        }
 
         StatusLine(state.status)
     }
@@ -103,6 +108,7 @@ private fun StatusLine(status: ConversionStatus) {
         is ConversionStatus.Failed -> SelectionContainer {
             Text(status.reason, color = MaterialTheme.colors.error)
         }
+        ConversionStatus.Cancelled -> Text("Conversion cancelled.")
     }
 }
 

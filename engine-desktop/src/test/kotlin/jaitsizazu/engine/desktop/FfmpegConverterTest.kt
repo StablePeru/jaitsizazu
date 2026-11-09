@@ -3,6 +3,9 @@ package jaitsizazu.engine.desktop
 import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.MediaResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.Test
@@ -23,6 +26,10 @@ class FfmpegConverterTest {
 
     private val found = { FfmpegLookup.Found("/usr/bin/ffmpeg") }
     private val request = ConversionRequest("/voice/memo.ogg", AudioFormat.WAV)
+    private val deleted = mutableListOf<String>()
+
+    private fun converter(runner: ProcessRunner) =
+        FfmpegConverter(found, runner, fileExists = { false }, deleteFile = { deleted += it })
 
     @Test
     fun runsFfmpegWithTheBuiltArguments() = runTest {
@@ -90,5 +97,76 @@ class FfmpegConverterTest {
         assertIs<MediaResult.Failure>(result)
         assertTrue("Could not start ffmpeg" in result.reason, result.reason)
         assertTrue("Permission denied" in result.reason, result.reason)
+    }
+
+    @Test
+    fun deletesThePartialOutputWhenFfmpegFails() = runTest {
+        val runner = FakeRunner { ProcessOutcome(1, "Error while decoding stream") }
+
+        val result = converter(runner).convert(request, "/voice/memo.wav")
+
+        assertIs<MediaResult.Failure>(result)
+        assertEquals(listOf("/voice/memo.wav"), deleted)
+    }
+
+    @Test
+    fun keepsTheOutputWhenTheConversionSucceeds() = runTest {
+        val result = converter(FakeRunner { ProcessOutcome(0, "") }).convert(request, "/voice/memo.wav")
+
+        assertEquals(MediaResult.Success("/voice/memo.wav"), result)
+        assertTrue(deleted.isEmpty())
+    }
+
+    @Test
+    fun neverDeletesAFileThatFfmpegRefusedToOverwrite() = runTest {
+        // That file belongs to someone else: it appeared before ffmpeg started.
+        for (exitCode in listOf(0, 1)) {
+            val runner = FakeRunner { ProcessOutcome(exitCode, "File '/voice/memo.wav' already exists. Exiting.") }
+
+            assertIs<MediaResult.Failure>(converter(runner).convert(request, "/voice/memo.wav"))
+        }
+        assertTrue(deleted.isEmpty())
+    }
+
+    @Test
+    fun deletesNothingWhenFfmpegCannotStart() = runTest {
+        val runner = FakeRunner { throw IOException("error=2, No such file or directory") }
+
+        assertIs<MediaResult.Failure>(converter(runner).convert(request, "/voice/memo.wav"))
+        assertTrue(deleted.isEmpty())
+    }
+
+    @Test
+    fun deletesThePartialOutputAndRethrowsWhenCancelled() = runTest {
+        val hanging = object : ProcessRunner {
+            override suspend fun run(command: List<String>): ProcessOutcome = awaitCancellation()
+        }
+        var thrown: Throwable? = null
+        val job = launch {
+            try {
+                converter(hanging).convert(request, "/voice/memo.wav")
+            } catch (e: CancellationException) {
+                thrown = e
+                throw e
+            }
+        }
+        testScheduler.advanceUntilIdle()
+
+        job.cancel()
+        job.join()
+
+        assertIs<CancellationException>(thrown)
+        assertEquals(listOf("/voice/memo.wav"), deleted)
+    }
+
+    @Test
+    fun aFailedDeleteDoesNotHideTheConversionFailure() = runTest {
+        val runner = FakeRunner { ProcessOutcome(1, "Error while decoding stream") }
+        val converter = FfmpegConverter(found, runner, fileExists = { false }, deleteFile = { throw IOException("busy") })
+
+        val result = converter.convert(request, "/voice/memo.wav")
+
+        assertIs<MediaResult.Failure>(result)
+        assertTrue("exit code 1" in result.reason, result.reason)
     }
 }

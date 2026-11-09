@@ -21,7 +21,7 @@ class FfmpegArgumentsTest {
         assertEquals(
             listOf(
                 "-hide_banner", "-nostdin", "-loglevel", "error", "-n",
-                "-i", "in.ogg", "-vn", "-c:a", "pcm_s16le", "out.x",
+                "-protocol_whitelist", "file", "-i", "in.ogg", "-vn", "-c:a", "pcm_s16le", "out.x",
             ),
             argsFor(AudioFormat.WAV),
         )
@@ -52,6 +52,18 @@ class FfmpegArgumentsTest {
             val args = FfmpegArguments.build("C:\\voice notes\\memo.ogg", "C:\\voice notes\\memo.wav", format)
             assertEquals("C:\\voice notes\\memo.ogg", args[args.indexOf("-i") + 1])
             assertEquals("C:\\voice notes\\memo.wav", args.last())
+        }
+    }
+
+    @Test
+    fun letsTheInputReadOnlyLocalFilesForEveryFormat() {
+        // Applies to files a crafted playlist points at, too: no network, no other protocols.
+        for (format in AudioFormat.entries) {
+            val args = argsFor(format)
+            val whitelist = args.indexOf("-protocol_whitelist")
+            assertTrue(whitelist >= 0, "$format: -protocol_whitelist missing")
+            assertEquals("file", args[whitelist + 1], "$format")
+            assertTrue(whitelist < args.indexOf("-i"), "$format: the whitelist must come before -i")
         }
     }
 }

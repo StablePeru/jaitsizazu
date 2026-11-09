@@ -6,13 +6,21 @@ import jaitsizazu.core.ConvertMedia
 import jaitsizazu.core.MediaConverter
 import jaitsizazu.core.MediaResult
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle
@@ -32,10 +40,25 @@ class ConverterStateHolderTest {
         }
     }
 
+    /** Hangs on its first [hangs] calls until cancelled, like ffmpeg on an unreachable share. */
+    private class HangingConverter(private val hangs: Int = 1) : MediaConverter {
+        var calls = 0
+        var cancelled = false
+
+        override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
+            if (++calls > hangs) return MediaResult.Success(outputPath)
+            try {
+                awaitCancellation()
+            } finally {
+                cancelled = true
+            }
+        }
+    }
+
     private val memo = "/voice/memo.ogg"
 
-    private fun TestScope.holder(converter: MediaConverter, setupProblem: String? = null) =
-        ConverterStateHolder(ConvertMedia(converter) { it == memo }, this, setupProblem)
+    private fun TestScope.holder(converter: MediaConverter, workContext: CoroutineContext = EmptyCoroutineContext) =
+        ConverterStateHolder(ConvertMedia(converter) { it == memo }, this, workContext)
 
     @Test
     fun startsWithNoFileWavAndIdle() = runTest {
@@ -133,16 +156,120 @@ class ConverterStateHolderTest {
     }
 
     @Test
-    fun cannotConvertWhenTheEngineIsMissing() = runTest {
+    fun stillConvertsWhenFfmpegLookedMissingAtStartup() = runTest {
+        // The converter looks for ffmpeg again, so the user can fix it without a restart.
         val converter = FakeConverter()
-        val holder = holder(converter, setupProblem = "ffmpeg was not found.")
+        val holder = holder(converter)
+        holder.showSetupWarning("ffmpeg was not found.")
+        holder.selectFile(memo)
+        assertEquals("ffmpeg was not found.", holder.state.value.setupWarning)
+        assertTrue(holder.state.value.canConvert)
+
+        holder.convert()
+        advanceUntilIdle()
+
+        assertEquals(1, converter.requests.size)
+        assertEquals(ConversionStatus.Done("/voice/memo.wav"), holder.state.value.status)
+        assertNull(holder.state.value.setupWarning, "a conversion that worked proves ffmpeg is there")
+    }
+
+    @Test
+    fun keepsTheSetupWarningWhenTheConversionFails() = runTest {
+        val holder = holder(FakeConverter { MediaResult.Failure("ffmpeg was not found.") })
+        holder.showSetupWarning("ffmpeg was not found.")
         holder.selectFile(memo)
 
         holder.convert()
         advanceUntilIdle()
 
-        assertEquals("ffmpeg was not found.", holder.state.value.setupProblem)
-        assertFalse(holder.state.value.canConvert)
-        assertTrue(converter.requests.isEmpty())
+        assertEquals("ffmpeg was not found.", holder.state.value.setupWarning)
+    }
+
+    @Test
+    fun cancelStopsAStuckConversion() = runTest {
+        val converter = HangingConverter()
+        val holder = holder(converter)
+        holder.selectFile(memo)
+        holder.convert()
+        advanceUntilIdle()
+        assertEquals(ConversionStatus.Converting, holder.state.value.status)
+
+        holder.cancel()
+        assertEquals(ConversionStatus.Cancelled, holder.state.value.status)
+        advanceUntilIdle()
+
+        assertTrue(converter.cancelled, "the converter was not cancelled")
+        assertEquals(ConversionStatus.Cancelled, holder.state.value.status)
+        assertTrue(holder.state.value.canConvert)
+    }
+
+    @Test
+    fun convertsAgainAfterCancelling() = runTest {
+        val converter = HangingConverter(hangs = 1)
+        val holder = holder(converter)
+        holder.selectFile(memo)
+        holder.convert()
+        advanceUntilIdle()
+        holder.cancel()
+        advanceUntilIdle()
+
+        holder.convert()
+        advanceUntilIdle()
+
+        assertEquals(2, converter.calls)
+        assertEquals(ConversionStatus.Done("/voice/memo.wav"), holder.state.value.status)
+    }
+
+    @Test
+    fun aResultThatArrivesAfterCancelIsIgnored() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        // Ignores cancellation, like an engine that finishes anyway.
+        val stubborn = object : MediaConverter {
+            override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
+                withContext(NonCancellable) { gate.await() }
+                return MediaResult.Success(outputPath)
+            }
+        }
+        val holder = holder(stubborn)
+        holder.selectFile(memo)
+        holder.convert()
+        advanceUntilIdle()
+
+        holder.cancel()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(ConversionStatus.Cancelled, holder.state.value.status)
+    }
+
+    @Test
+    fun cancelDoesNothingWhenNotConverting() = runTest {
+        val holder = holder(FakeConverter())
+        holder.selectFile(memo)
+        holder.convert()
+        advanceUntilIdle()
+
+        holder.cancel()
+
+        assertEquals(ConversionStatus.Done("/voice/memo.wav"), holder.state.value.status)
+    }
+
+    @Test
+    fun runsTheConversionInTheWorkContext() = runTest {
+        // Main passes Dispatchers.IO, so file checks and ffmpeg lookups stay off the UI thread.
+        var seen: String? = null
+        val converter = object : MediaConverter {
+            override suspend fun convert(request: ConversionRequest, outputPath: String): MediaResult {
+                seen = currentCoroutineContext()[CoroutineName]?.name
+                return MediaResult.Success(outputPath)
+            }
+        }
+        val holder = holder(converter, workContext = CoroutineName("work"))
+        holder.selectFile(memo)
+
+        holder.convert()
+        advanceUntilIdle()
+
+        assertEquals("work", seen)
     }
 }

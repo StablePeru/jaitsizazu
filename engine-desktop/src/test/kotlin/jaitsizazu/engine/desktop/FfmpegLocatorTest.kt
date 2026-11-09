@@ -6,6 +6,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Paths are written with forward slashes and always go through [Path.of],
+ * on both sides of each comparison, so the tests pass on Windows hosts too.
+ */
 class FfmpegLocatorTest {
 
     private fun locator(
@@ -17,8 +21,11 @@ class FfmpegLocatorTest {
         environment = env::get,
         appDirectory = appDirectory?.let(Path::of),
         isWindows = isWindows,
-        isExecutableFile = { it.toString() in files },
+        isExecutableFile = { it in files.map(Path::of) },
     )
+
+    /** What the locator returns for [path], in the separators of the current OS. */
+    private fun found(path: String) = FfmpegLookup.Found(Path.of(path).toString())
 
     @Test
     fun prefersTheEnvironmentVariable() {
@@ -28,7 +35,7 @@ class FfmpegLocatorTest {
             files = setOf("/custom/ffmpeg", "/opt/app/bin/ffmpeg", "/usr/bin/ffmpeg"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/custom/ffmpeg"), result)
+        assertEquals(found("/custom/ffmpeg"), result)
     }
 
     @Test
@@ -50,7 +57,7 @@ class FfmpegLocatorTest {
             files = setOf("/usr/bin/ffmpeg"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/usr/bin/ffmpeg"), result)
+        assertEquals(found("/usr/bin/ffmpeg"), result)
     }
 
     @Test
@@ -61,7 +68,7 @@ class FfmpegLocatorTest {
             files = setOf("/opt/app/bin/ffmpeg", "/usr/bin/ffmpeg"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/opt/app/bin/ffmpeg"), result)
+        assertEquals(found("/opt/app/bin/ffmpeg"), result)
     }
 
     @Test
@@ -72,7 +79,7 @@ class FfmpegLocatorTest {
             files = setOf("/opt/app/bin/ffmpeg", "/opt/app/bin/ffmpeg.exe"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/opt/app/bin/ffmpeg.exe"), result)
+        assertEquals(found("/opt/app/bin/ffmpeg.exe"), result)
     }
 
     @Test
@@ -82,7 +89,7 @@ class FfmpegLocatorTest {
             files = setOf("/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/usr/local/bin/ffmpeg"), result)
+        assertEquals(found("/usr/local/bin/ffmpeg"), result)
     }
 
     @Test
@@ -93,7 +100,7 @@ class FfmpegLocatorTest {
             files = setOf("/tools/ffmpeg/ffmpeg.exe"),
         ).locate()
 
-        assertEquals(FfmpegLookup.Found("/tools/ffmpeg/ffmpeg.exe"), result)
+        assertEquals(found("/tools/ffmpeg/ffmpeg.exe"), result)
     }
 
     @Test
@@ -104,6 +111,8 @@ class FfmpegLocatorTest {
         assertTrue("PATH" in result.message)
         assertTrue("JAITSIZAZU_FFMPEG" in result.message)
         assertTrue("bin" in result.message)
+        // The converter looks for ffmpeg again on every conversion.
+        assertTrue("try again" in result.message, result.message)
     }
 
     @Test

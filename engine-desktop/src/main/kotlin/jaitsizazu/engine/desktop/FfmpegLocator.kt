@@ -67,7 +67,8 @@ class FfmpegLocator(
         return "ffmpeg was not found. Jaitsizazu needs it to convert files. " +
             "Install ffmpeg so that it is on your PATH, " +
             "or set $ENV_VAR to the full path of the ffmpeg binary, " +
-            "or put it in the app folder as $bundled. Then restart Jaitsizazu."
+            "or put it in the app folder as $bundled. Then try again. " +
+            "If you changed PATH or $ENV_VAR, restart Jaitsizazu first."
     }
 
     companion object {

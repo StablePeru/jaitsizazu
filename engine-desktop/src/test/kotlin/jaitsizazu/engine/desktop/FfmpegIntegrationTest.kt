@@ -4,13 +4,21 @@ import jaitsizazu.core.AudioFormat
 import jaitsizazu.core.ConversionRequest
 import jaitsizazu.core.ConvertMedia
 import jaitsizazu.core.MediaResult
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -18,6 +26,7 @@ import kotlin.test.fail
 /**
  * Runs the real ffmpeg. The Docker build image installs it, so this runs in
  * `./gradlew check`. Without ffmpeg on the machine, these tests fail on purpose.
+ * The cancellation test also needs `mkfifo`, so it expects a POSIX system.
  */
 class FfmpegIntegrationTest {
 
@@ -51,8 +60,10 @@ class FfmpegIntegrationTest {
         dir.deleteRecursively()
     }
 
-    private fun convert(format: AudioFormat, output: File): MediaResult = runBlocking {
-        converter.convert(ConversionRequest(voiceNote.path, format), output.path)
+    private fun convert(format: AudioFormat, output: File): MediaResult = convertFile(voiceNote, format, output)
+
+    private fun convertFile(input: File, format: AudioFormat, output: File): MediaResult = runBlocking {
+        converter.convert(ConversionRequest(input.path, format), output.path)
     }
 
     private fun File.startsWith(magic: String) =
@@ -111,5 +122,52 @@ class FfmpegIntegrationTest {
 
         assertEquals(MediaResult.Success(File(dir, "voice.wav").path), convertMedia(request))
         assertEquals(MediaResult.Success(File(dir, "voice (1).wav").path), convertMedia(request))
+    }
+
+    @Test
+    fun cancellingAStuckConversionRemovesThePartialOutput() = runBlocking {
+        // A FIFO that never reaches its end stands in for an unreachable network
+        // share: ffmpeg creates the output, then waits for more input forever.
+        val fifo = File(dir, "stuck.ogg")
+        val mkfifo = SystemProcessRunner().run(listOf("mkfifo", fifo.path))
+        assertEquals(0, mkfifo.exitCode, mkfifo.stderrTail)
+        val release = CountDownLatch(1)
+        thread(isDaemon = true) {
+            runCatching {
+                FileOutputStream(fifo).use {
+                    it.write(voiceNote.readBytes())
+                    it.flush()
+                    release.await()
+                }
+            }
+        }
+        val output = File(dir, "stuck.wav")
+
+        try {
+            val job = launch { converter.convert(ConversionRequest(fifo.path, AudioFormat.WAV), output.path) }
+            withTimeout(30_000) { while (!output.exists()) delay(50) }
+
+            withTimeout(30_000) { job.cancelAndJoin() }
+
+            assertFalse(output.exists(), "the partial output was left behind")
+        } finally {
+            release.countDown()
+        }
+    }
+
+    @Test
+    fun aCraftedPlaylistCannotMakeFfmpegOpenAUrl() {
+        // Port 9 on the loopback: nothing leaves the machine even without the whitelist.
+        val playlist = File(dir, "list.m3u8").apply {
+            writeText(
+                listOf("#EXTM3U", "#EXT-X-TARGETDURATION:1", "#EXTINF:1,", "http://127.0.0.1:9/a.ts", "#EXT-X-ENDLIST")
+                    .joinToString("\n", postfix = "\n"),
+            )
+        }
+
+        val result = convertFile(playlist, AudioFormat.WAV, File(dir, "list.wav"))
+
+        assertIs<MediaResult.Failure>(result)
+        assertTrue("not on whitelist 'file'" in result.reason, result.reason)
     }
 }

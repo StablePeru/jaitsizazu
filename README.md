@@ -8,7 +8,7 @@ Jaitsizazu will download audio and video from YouTube and similar sites, and con
 
 1. Click **Choose file** and pick an audio file, for example a WhatsApp voice note.
 2. Pick the format: WAV (the default), MP3, FLAC or Ogg Vorbis.
-3. Click **Convert**.
+3. Click **Convert**. While it runs, **Cancel** stops it and removes the unfinished file.
 
 The new file is saved next to the original. Nothing is ever overwritten: if `memo.wav` exists, you get `memo (1).wav`.
 
@@ -22,7 +22,7 @@ The app runs [FFmpeg](https://ffmpeg.org/) to convert. It looks for it in this o
 | 2 | `bin/ffmpeg` (`bin\ffmpeg.exe` on Windows) in the folder of the installed app launcher. |
 | 3 | `ffmpeg` on your `PATH`. |
 
-If none is found, the window says so and explains these options.
+If none is found at startup, the window warns about it and explains these options. **Convert** stays available: the app looks for ffmpeg again on every conversion, so you can fix it and try again. A change to `PATH` or to `JAITSIZAZU_FFMPEG` needs a restart, because the app reads its environment when it starts.
 
 ## Why
 
