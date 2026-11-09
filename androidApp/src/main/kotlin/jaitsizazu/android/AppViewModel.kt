@@ -9,6 +9,7 @@ import jaitsizazu.core.ConvertMedia
 import jaitsizazu.core.DownloadMedia
 import jaitsizazu.core.Problem
 import jaitsizazu.core.Tool
+import jaitsizazu.engine.android.AndroidProcessTree
 import jaitsizazu.engine.android.AndroidYtDlpUpdater
 import jaitsizazu.engine.android.DownloadsPublisher
 import jaitsizazu.engine.android.JobFolders
@@ -49,7 +50,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val runtime = YoutubeDlAndroidSetup.runtime(application)
     private val jobs = JobFolders(application.cacheDir.toPath().resolve("jobs"))
-    private val runner = SystemProcessRunner(startProcess = runtime::startProcess)
+    private val runner = SystemProcessRunner(
+        startProcess = runtime::startProcess,
+        // Android has no Process.descendants(): a cancel must still stop the ffmpeg that yt-dlp started.
+        killDescendants = AndroidProcessTree()::killDescendants,
+    )
     private val publisher = DownloadsPublisher(application)
 
     val converter = ConverterStateHolder(

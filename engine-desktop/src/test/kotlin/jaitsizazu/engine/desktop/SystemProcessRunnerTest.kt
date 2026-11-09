@@ -153,6 +153,33 @@ class SystemProcessRunnerTest {
     }
 
     @Test
+    fun killsTheChildrenWithTheGivenKillerBeforeTheProcessItself() = runBlocking {
+        // How the Android app kills them, without Process.descendants().
+        val process = SlowToDieProcess(dieAfterMillis = 0)
+        val aliveWhenChildrenKilled = mutableListOf<Boolean>()
+        val runner = SystemProcessRunner(
+            startProcess = { process },
+            killDescendants = { aliveWhenChildrenKilled += it === process && it.isAlive },
+        )
+
+        cancelWhileWaiting(process, runner)
+
+        // The runner may try again while the process dies; the first try comes before the process is killed.
+        assertEquals(true, aliveWhenChildrenKilled.firstOrNull(), "the children were not killed first")
+        assertFalse(process.isAlive, "the process was not killed")
+    }
+
+    @Test
+    fun killsTheProcessItselfWhenTheGivenKillerFails() = runBlocking {
+        val process = SlowToDieProcess(dieAfterMillis = 0)
+        val runner = SystemProcessRunner(startProcess = { process }, killDescendants = { error("no /proc") })
+
+        cancelWhileWaiting(process, runner)
+
+        assertFalse(process.isAlive, "the process was not killed")
+    }
+
+    @Test
     fun waitsForAKilledProcessOnlyForABoundedTime() = runBlocking {
         val process = SlowToDieProcess(dieAfterMillis = 60_000)
         val runner = SystemProcessRunner(startProcess = { process }, exitTimeout = 200.milliseconds)

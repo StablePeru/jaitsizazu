@@ -42,15 +42,21 @@ interface ProcessRunner {
  * [startProcess] starts the process; tests replace it, and the Android app
  * sets the environment there.
  *
+ * [killDescendants] kills the processes that a process started, before the
+ * process itself is killed. The default uses `Process.descendants()`.
  * Android runs this class too, so it only uses APIs that Android 8 (API level
- * 26) has. Android has no `Process.descendants()`: there, the call fails, the
- * failure is ignored, and only the process itself is killed.
+ * 26) has. Android has no `Process.descendants()`, so the Android app passes
+ * its own. When [killDescendants] fails, the failure is ignored and only the
+ * process itself is killed.
  */
 class SystemProcessRunner(
     private val maxStderrLines: Int = 20,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val exitTimeout: Duration = 5.seconds,
     private val startProcess: (List<String>) -> Process = { ProcessBuilder(it).start() },
+    private val killDescendants: (Process) -> Unit = { process ->
+        process.descendants().forEach { it.destroyForcibly() }
+    },
 ) : ProcessRunner {
 
     override suspend fun run(command: List<String>, onOutputLine: ((String) -> Unit)?): ProcessOutcome =
@@ -115,7 +121,7 @@ class SystemProcessRunner(
         // A test double that is not an OS process cannot list its children, and
         // Android has no descendants() at all: runCatching also catches that
         // NoSuchMethodError, so the process itself is still killed.
-        runCatching { process.descendants().forEach { it.destroyForcibly() } }
+        runCatching { killDescendants(process) }
         process.destroyForcibly()
     }
 
